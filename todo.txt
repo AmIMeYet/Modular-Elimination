@@ -1,0 +1,21 @@
+Ships:
+  Building
+  Loading/Saving
+
+Enemies:
+  Ships
+  AI
+
+Modules:
+  Weapons:
+    Laser
+    Rockets
+    Drones
+  Small thruster
+  Huge thruster
+  Upgrade bay
+  
+  Shields
+  
+  Module integrity
+  Power storage

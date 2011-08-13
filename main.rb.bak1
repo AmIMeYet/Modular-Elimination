@@ -1,0 +1,764 @@
+require 'gosu'
+require 'chipmunk'
+
+SCREEN_WIDTH = 640
+SCREEN_HEIGHT = 480
+
+# The number of steps to process every Gosu update
+# The Player ship can get going so fast as to "move through" a
+# star without triggering a collision; an increased number of
+# Chipmunk step calls per update will effectively avoid this issue
+SUBSTEPS = 3
+
+$debug = 1
+
+# Convenience method for converting from radians to a Vec2 vector.
+class Numeric
+  def radians_to_vec2
+    CP::Vec2.new(Math::cos(self), Math::sin(self))
+  end
+end
+
+# Layering of sprites
+module ZOrder
+  Background, Player, Particles, UI = *0..3
+end
+
+module Projectiles
+  class Rocket
+    attr_reader :shape, :mount_points
+    
+    MOUNT_POINTS = []
+    
+    def initialize(window, x, y, angle=0, trigger=nil)
+      @window = window
+      @trigger = trigger
+      
+      @mount_points = MOUNT_POINTS
+      
+      @spawn_time = Time.now
+      
+      # Create the Body for the Player
+      body = CP::Body.new(10.0, 150.0)
+      
+      # In order to create a shape, we must first define it
+      # Chipmunk defines 3 types of Shapes: Segments, Circles and Polys
+      # We'll use s simple, 4 sided Poly for our Player (ship)
+      # You need to define the vectors so that the "top" of the Shape is towards 0 radians (the right)
+      shape_array = [CP::Vec2.new(-10.0, -2.5), CP::Vec2.new(-10.0, 2.5), CP::Vec2.new(10.0, 2.5), CP::Vec2.new(10.0, -2.5)]
+      @shape = CP::Shape::Poly.new(body, shape_array, CP::Vec2.new(0,0))
+      
+      # The collision_type of a shape allows us to set up special collision behavior
+      # based on these types.  The actual value for the collision_type is arbitrary
+      # and, as long as it is consistent, will work for us; of course, it helps to have it make sense
+      @shape.collision_type = :rocket
+      
+      @shape.body.p = CP::Vec2.new(x, y) # position
+      @shape.body.v = CP::Vec2.new(0.0, 0.0) # velocity
+      # Keep in mind that down the screen is positive y, which means that PI/2 radians,
+      # which you might consider the top in the traditional Trig unit circle sense is actually
+      # the bottom; thus 3PI/2 is the top
+      @shape.body.a = angle.degrees_to_radians #(3*Math::PI/2.0) # angle in radians; faces towards top of screen
+      @shape.body.object = self
+      
+      window.space.add_body(body)
+      window.space.add_shape(shape)
+    end
+    
+    def update
+      if Time.now - @spawn_time < 2 # Two seconds of thrust
+        @shape.body.apply_impulse(@shape.body.a.radians_to_vec2 * (30.0 / SUBSTEPS), CP::Vec2.new(0.0, 0.0))
+        Particles::ExaustFire.new(@window, @shape.body.p.x, @shape.body.p.y, @shape.body.a.radians_to_gosu-180) if rand(100) < 50
+      elsif Time.now - @spawn_time > 260 # One minute to live
+        @window.schedule_remove(self)
+      end
+    end
+    def draw()
+    
+    end
+  end
+end
+
+module Modules
+  class Tube
+    attr_reader :shape, :mount_points
+    
+    MOUNT_POINTS = [CP::Vec2.new(-35.0, 0.0), CP::Vec2.new(35.0, 0.0), CP::Vec2.new(0.0, 25.0), CP::Vec2.new(0.0, -25.0)]
+    
+    def initialize(window, x, y, angle=0, trigger=nil)
+      @mount_points = MOUNT_POINTS
+      
+      @window = window
+      @trigger = trigger
+          
+      # Create the Body for the Player
+      body = CP::Body.new(10.0, 150.0)
+      
+      # In order to create a shape, we must first define it
+      # Chipmunk defines 3 types of Shapes: Segments, Circles and Polys
+      # We'll use s simple, 4 sided Poly for our Player (ship)
+      # You need to define the vectors so that the "top" of the Shape is towards 0 radians (the right)
+      shape_array = [CP::Vec2.new(-35.0, -25.0), CP::Vec2.new(-35.0, 25.0), CP::Vec2.new(35.0, 25.0), CP::Vec2.new(35.0, -25.0)]
+      @shape = CP::Shape::Poly.new(body, shape_array, CP::Vec2.new(0,0))
+      
+      # The collision_type of a shape allows us to set up special collision behavior
+      # based on these types.  The actual value for the collision_type is arbitrary
+      # and, as long as it is consistent, will work for us; of course, it helps to have it make sense
+      @shape.collision_type = :module
+      
+      @shape.body.p = CP::Vec2.new(x, y) # position
+      @shape.body.v = CP::Vec2.new(0.0, 0.0) # velocity
+      @shape.body.a = angle.degrees_to_radians
+      @shape.body.object = self
+      
+      window.space.add_body(body)
+      window.space.add_shape(shape)
+      
+      @image = Gosu::Image.new(window, "media/tube.png", false)
+    end
+    
+    def update
+    end
+    
+    def draw()
+      @image.draw_rot(@shape.body.p.x, @shape.body.p.y, ZOrder::Player, @shape.body.a.radians_to_gosu - 90)
+    end
+  end
+  
+  class Thruster
+    attr_reader :shape, :mount_points
+    
+    MOUNT_POINTS = [CP::Vec2.new(0, -15.0), CP::Vec2.new(0, 15.0), CP::Vec2.new(10.0, 0)]
+    THRUST_POINT = CP::Vec2.new(-10, 0)
+    
+    def initialize(window, x, y, angle=0, trigger=Gosu::KbW)
+      @mount_points = MOUNT_POINTS
+      
+      @window = window
+      @trigger = trigger
+      
+      # Create the Body for the Player
+      body = CP::Body.new(10.0, 150.0)
+      
+      # In order to create a shape, we must first define it
+      # Chipmunk defines 3 types of Shapes: Segments, Circles and Polys
+      # We'll use s simple, 4 sided Poly for our Player (ship)
+      # You need to define the vectors so that the "top" of the Shape is towards 0 radians (the right)
+      shape_array = [CP::Vec2.new(-15.0, -15.0), CP::Vec2.new(-15.0, 15.0), CP::Vec2.new(10.0, 15.0), CP::Vec2.new(10.0, -15.0)]
+      @shape = CP::Shape::Poly.new(body, shape_array, CP::Vec2.new(0,0))
+      
+      # The collision_type of a shape allows us to set up special collision behavior
+      # based on these types.  The actual value for the collision_type is arbitrary
+      # and, as long as it is consistent, will work for us; of course, it helps to have it make sense
+      @shape.collision_type = :module
+      
+      @shape.body.p = CP::Vec2.new(x, y) # position
+      @shape.body.v = CP::Vec2.new(0.0, 0.0) # velocity
+      # Keep in mind that down the screen is positive y, which means that PI/2 radians,
+      # which you might consider the top in the traditional Trig unit circle sense is actually
+      # the bottom; thus 3PI/2 is the top
+      @shape.body.a = angle.degrees_to_radians #(3*Math::PI/2.0) # angle in radians; faces towards top of screen
+      @shape.body.object = self
+      
+      window.space.add_body(body)
+      window.space.add_shape(shape)
+      
+      @image = Gosu::Image.new(window, "media/thruster.png", false)
+      
+      @states = {:thrust => 0.0}
+    end
+    def trigger
+      @shape.body.apply_impulse((@shape.body.a.radians_to_vec2), CP::Vec2.new(0.0, 0.0))#(@shape.body.a.radians_to_vec2 * (3000.0/SUBSTEPS))
+      @states[:thrust] = 1.0
+    end
+    
+    #def reverse
+    #  @shape.body.apply_impulse(-(@shape.body.a.radians_to_vec2), CP::Vec2.new(0.0, 0.0))#(@shape.body.a.radians_to_vec2 * (3000.0/SUBSTEPS))
+    #  @states[:thrust] = 1.0
+    #end
+    def update
+      #accelerate if @window.button_down? Gosu::Kb1
+      #reverse if @window.button_down? Gosu::Kb2
+      
+      trigger if @window.button_down? @trigger
+      if @states[:thrust] >= 0.1
+        @states[:thrust] -= 0.1
+        point = @shape.body.local2world(THRUST_POINT)
+        Particles::ExaustFire.new(@window, point.x, point.y, @shape.body.a.radians_to_gosu-180) if rand(100) < 10
+      else
+        @states[:thrust] = 0.0
+      end
+    end
+    def draw()
+      @image.draw_rot(@shape.body.p.x, @shape.body.p.y, ZOrder::Player, @shape.body.a.radians_to_gosu, 0.5, 0.5, 1, 1,
+       Gosu::Color.new(255, 255, (255 - (100 * @states[:thrust])).to_i, (255 - (100 * @states[:thrust])).to_i))
+    end
+  end
+end
+
+# This game will have one Player in the form of a ship
+class Player
+  attr_reader :shape, :mount_points
+  
+  MOUNT_POINTS = []
+
+  def initialize(window, shape)
+    @mount_points = MOUNT_POINTS
+  
+    @window = window
+    
+    @image = Gosu::Image.new(window, "media/Starfighter.bmp", false)
+    @shape = shape
+    @shape.body.p = CP::Vec2.new(0.0, 0.0) # position
+    @shape.body.v = CP::Vec2.new(0.0, 0.0) # velocity
+    
+    # Keep in mind that down the screen is positive y, which means that PI/2 radians,
+    # which you might consider the top in the traditional Trig unit circle sense is actually
+    # the bottom; thus 3PI/2 is the top
+    #@shape.body.a = (3*Math::PI/2.0) # angle in radians; faces towards top of screen
+    
+    @states = {:thrust => 0.0}
+  end
+  
+  # Directly set the position of our Player
+  def warp(vect)
+    @shape.body.p = vect
+  end
+  
+  # Apply forward force; Chipmunk will do the rest
+  # SUBSTEPS is used as a divisor to keep acceleration rate constant
+  # even if the number of steps per update are adjusted
+  # Here we must convert the angle (facing) of the body into
+  # forward momentum by creating a vector in the direction of the facing
+  # and with a magnitude representing the force we want to apply
+  def accelerate
+    #@shape.body.apply_impulse(@shape.body.a.radians_to_vec2, CP::Vec2.new(0.0, 0.0))#(@shape.body.a.radians_to_vec2 * (3000.0/SUBSTEPS))
+    @shape.body.apply_impulse((@shape.body.a.radians_to_vec2 * 4), CP::Vec2.new(0.0, 0.0))#(@shape.body.a.radians_to_vec2 * (3000.0/SUBSTEPS))
+    @states[:thrust] = 1.0
+  end
+  
+  # Apply even more forward force
+  # See accelerate for more details
+  def boost
+    @shape.body.apply_impulse((@shape.body.a.radians_to_vec2 * 8), CP::Vec2.new(0.0, 0.0))
+    @states[:thrust] = 2.0
+  end
+  
+  # Apply reverse force
+  # See accelerate for more details
+  def reverse
+    @shape.body.apply_impulse(-(@shape.body.a.radians_to_vec2 * 4), CP::Vec2.new(0.0, 0.0))
+  end
+  
+  # Wrap to the other side of the screen when we fly off the edge
+  def validate_position
+    l_position = CP::Vec2.new(@shape.body.p.x % SCREEN_WIDTH, @shape.body.p.y % SCREEN_HEIGHT)
+    @shape.body.p = l_position
+  end
+  
+  def update
+    # Wrap around the screen to the other side
+    validate_position
+    
+    if @window.button_down? Gosu::KbUp
+      if ((@window.button_down? Gosu::KbRightShift) || (@window.button_down? Gosu::KbLeftShift))
+        boost
+      else
+        accelerate
+      end
+    elsif @window.button_down? Gosu::KbDown
+      reverse
+    end
+  
+    if @states[:thrust] >= 0.1
+      @states[:thrust] -= 0.1
+    else
+      @states[:thrust] = 0.0
+    end
+  end
+  
+  def draw
+    @image.draw_rot(@shape.body.p.x, @shape.body.p.y, ZOrder::Player, @shape.body.a.radians_to_gosu, 0.5, 0.5, 1, 1,
+      Gosu::Color.new(255, 255, (255 - (100 * @states[:thrust])).to_i, (255 - (100 * @states[:thrust])).to_i))
+  end
+end
+
+module Particles
+  class BasicParticle
+    attr_reader :window
+    def initialize(window, x, y, rotation=nil, angle=nil)
+      @window = window
+      
+      @x = x
+      @y = y
+      
+      @rot = rotation
+      @rot ||= rand(360)
+      
+      @angle = angle
+      
+      @window.particle_system.add_particle(self)
+    end
+    
+    def die
+      @window.particle_system.remove_particle(self)
+    end    
+  end
+  
+  class ExaustFire < BasicParticle
+    def initialize(window, x, y, angle=nil)
+      super(window, x, y, nil, angle)
+      
+      @color = Gosu::Color.new(255,255,255,255)
+      @image = Gosu::Image.new(window,"media/fireball.png",false)
+    
+      if rand > 0.5 then @left = true else @left = false end
+    end
+    
+    def update
+      if @angle
+        @x += Gosu::offset_x(@angle, 1)
+        @y += Gosu::offset_y(@angle, 1)
+      end
+    
+      if @color.alpha-8 > 0 then @color.alpha-=8 else die end
+      if @left then @rot -= rand(10) else @rot += rand(10) end
+    end
+    
+    def draw
+      scale = 1 #@color.alpha/200
+      @image.draw_rot(@x, @y, ZOrder::Player, @rot, 0.5, 0.5, scale, scale, @color, :additive)
+    end
+  end
+end
+
+class Connection
+  def initialize(window, body_a, body_b)
+    @window = window
+    
+    @constraints = []
+    
+    @body_a = body_a
+    @body_b = body_b
+    
+    constraint = CP::Constraint::PinJoint.new(body_a, body_b, CP::Vec2.new(0, 10), CP::Vec2.new(10, 0)))
+    @constraints << constraint
+    @space.add_constraint(constraint)
+    
+    constraint = CP::Constraint::PinJoint.new(body_a, body_b, CP::Vec2.new(0, -10), CP::Vec2.new(-10, 10))
+    @constraints << constraint
+    @space.add_constraint(constraint)
+  end
+  
+  def remove
+    removed_constraints = @space.cp_constraints.reject do |constraint|
+      #(constraint.body_a != object.shape.body && constraint.body_b != object.shape.body)
+      constraint.body_a != @body_a && constraint.body_b != @body_b)
+      
+      
+    end
+    
+    @constraints.each do |constraint|
+      @space.remove_constraint(constraint)
+    end
+  end
+end
+
+class ParticleSystem
+  def initialize(window)
+    @window = window
+    
+    @particles = []
+  end
+  
+  def add_particle(particle)
+    @particles << particle
+  end
+  
+  def remove_particle(particle)
+    @particles.delete(particle)
+  end
+  
+  def update
+    @particles.each do |particle|
+      particle.update
+    end
+  end
+  
+  def draw
+    @particles.each do |particle|
+      particle.draw
+    end
+  end
+end
+
+class CP::Space
+  attr_reader :cp_constraints
+  alias :add_constraint_old :add_constraint
+  alias :remove_constraint_old :remove_constraint
+  
+  def add_constraint(constraint)
+    @cp_constraints ||= []
+    @cp_constraints << constraint
+    add_constraint_old(constraint)
+  end
+  
+  def remove_constraint(constraint)
+    @cp_constraints.delete(constraint) if @cp_constraints && @cp_constraints.include?(constraint)
+    remove_constraint_old(constraint)
+  end
+end
+
+class GameWindow < Gosu::Window
+  attr_reader :space, :particle_system
+  
+  def initialize
+    super(SCREEN_WIDTH, SCREEN_HEIGHT, false, 16)
+    self.caption = "Modular Elimination"
+    
+    @mount_point_image = Gosu::Image.new(self, "media/mount_point.png", false)
+
+    @font = Gosu::Font.new(self, Gosu::default_font_name, 20)
+    
+    # Time increment over which to apply a physics "step" ("delta t")
+    @dt = (1.0/60.0)
+    
+    # Create our Space and set its damping
+    # A damping of 0.8 causes the ship bleed off its force and torque over time
+    # This is not realistic behavior in a vacuum of space, but it gives the game
+    # the feel I'd like in this situation
+    @space = CP::Space.new
+    @space.damping = 1.0 # 0.8
+    
+    @connections = []
+    @particle_system = ParticleSystem.new(self)
+    
+    # Create the Body for the Player
+    body = CP::Body.new(10.0, 150.0)
+    
+    # In order to create a shape, we must first define it
+    # Chipmunk defines 3 types of Shapes: Segments, Circles and Polys
+    # We'll use s simple, 4 sided Poly for our Player (ship)
+    # You need to define the vectors so that the "top" of the Shape is towards 0 radians (the right)
+    shape_array = [CP::Vec2.new(-25.0, -25.0), CP::Vec2.new(-25.0, 25.0), CP::Vec2.new(25.0, 1.0), CP::Vec2.new(25.0, -1.0)]
+    shape = CP::Shape::Poly.new(body, shape_array, CP::Vec2.new(0,0))
+    
+    # The collision_type of a shape allows us to set up special collision behavior
+    # based on these types.  The actual value for the collision_type is arbitrary
+    # and, as long as it is consistent, will work for us; of course, it helps to have it make sense
+    shape.collision_type = :ship
+    
+    @space.add_body(body)
+    @space.add_shape(shape)
+    
+    @space.add_collision_func(:rocket, :module) do |rocket_shape, ship_shape|
+      (@modules+[@player]).each do |mod|
+        next if mod.shape == rocket_shape # Don't collide with self!
+        force_multiplier = 1000.0
+        diff = mod.shape.body.p - rocket_shape.body.p
+        length = diff.length
+        dir = diff.normalize_safe
+        
+        mod.shape.body.apply_impulse(dir * ((1.0/length) * force_multiplier), CP::Vec2.new(0.0, 0.0))
+      end
+      
+      schedule_remove(rocket_shape.body.object) # I'm gone!
+      schedule_remove(ship_shape.body.object) #lol!
+      
+      false # Don't do any physics here!
+    end
+
+    @player = Player.new(self, shape)
+    @player.shape.body.object = @player
+    @player.warp(CP::Vec2.new(320, 50)) # move to the center of the window
+    
+    @modules = []
+    @remove_queue = []    
+
+=begin    
+    mod1 = Modules::Tube.new(self, 220, 100)
+    mod2 = Modules::Tube.new(self, 220, 150)
+    mod3 = Modules::Tube.new(self, 220, 200)
+    @space.add_constraint(CP::Constraint::PinJoint.new(mod1.shape.body, mod2.shape.body,CP::Vec2.new(-20, 0), CP::Vec2.new(20, 0)))
+    @space.add_constraint(CP::Constraint::PinJoint.new(mod1.shape.body, mod2.shape.body,CP::Vec2.new(20, 0), CP::Vec2.new(-20, 0)))
+    @space.add_constraint(CP::Constraint::PinJoint.new(mod2.shape.body, mod3.shape.body,CP::Vec2.new(-20, 0), CP::Vec2.new(20, 0)))
+    @space.add_constraint(CP::Constraint::PinJoint.new(mod2.shape.body, mod3.shape.body,CP::Vec2.new(20, 0), CP::Vec2.new(-20, 0)))
+    @modules << mod1
+    @modules << mod2
+    @modules << mod3
+    
+    thrust1 = Modules::Thruster.new(self, 170, 100, -90)
+    thrust2 = Modules::Thruster.new(self, 270, 100, -90)
+    @space.add_constraint(CP::Constraint::PinJoint.new(thrust1.shape.body, mod1.shape.body, CP::Vec2.new(10, 0), CP::Vec2.new(0, 10)))
+    @space.add_constraint(CP::Constraint::PinJoint.new(thrust1.shape.body, mod1.shape.body, CP::Vec2.new(-10, 0), CP::Vec2.new(0, -10)))
+    @space.add_constraint(CP::Constraint::PinJoint.new(thrust2.shape.body, mod1.shape.body, CP::Vec2.new(10, 0), CP::Vec2.new(0, 10)))
+    @space.add_constraint(CP::Constraint::PinJoint.new(thrust2.shape.body, mod1.shape.body, CP::Vec2.new(-10, 0), CP::Vec2.new(0, -10)))
+    @modules << thrust1
+    @modules << thrust2
+    
+    thrust3 = Modules::Thruster.new(self, 220, 65, 90, Gosu::KbS)
+    @space.add_constraint(CP::Constraint::PinJoint.new(thrust3.shape.body, mod1.shape.body, CP::Vec2.new(0, 10), CP::Vec2.new(10, 0)))
+    @space.add_constraint(CP::Constraint::PinJoint.new(thrust3.shape.body, mod1.shape.body, CP::Vec2.new(0, -10), CP::Vec2.new(-10, 0)))
+    @modules << thrust3
+    
+    mod1 = Modules::Tube.new(self, 420, 100)
+    @modules << mod1
+    
+    thrust1 = Modules::Thruster.new(self, 370, 100, -90)
+    thrust2 = Modules::Thruster.new(self, 470, 100, -90)
+    @space.add_constraint(CP::Constraint::PinJoint.new(thrust1.shape.body, mod1.shape.body, CP::Vec2.new(10, 0), CP::Vec2.new(0, 10)))
+    @space.add_constraint(CP::Constraint::PinJoint.new(thrust1.shape.body, mod1.shape.body, CP::Vec2.new(-10, 0), CP::Vec2.new(0, -10)))
+    @space.add_constraint(CP::Constraint::PinJoint.new(thrust2.shape.body, mod1.shape.body, CP::Vec2.new(10, 0), CP::Vec2.new(0, 10)))
+    @space.add_constraint(CP::Constraint::PinJoint.new(thrust2.shape.body, mod1.shape.body, CP::Vec2.new(-10, 0), CP::Vec2.new(0, -10)))
+    @modules << thrust1
+    @modules << thrust2
+    
+    thrust3 = Modules::Thruster.new(self, 420, 65, 90, Gosu::KbS)
+    @space.add_constraint(CP::Constraint::PinJoint.new(thrust3.shape.body, mod1.shape.body, CP::Vec2.new(0, 10), CP::Vec2.new(10, 0)))
+    @space.add_constraint(CP::Constraint::PinJoint.new(thrust3.shape.body, mod1.shape.body, CP::Vec2.new(0, -10), CP::Vec2.new(-10, 0)))
+    @modules << thrust3
+=end
+
+    # TODO:
+    # Mini thrusters maken
+    # En die dan bijvoorbeeld links boven en recht onder doen (om naar rechts te keren)
+    #     ^
+    #   >| |<
+    #    | |
+    #  v | | v
+    # >==| |==<
+    #   ^^^^^
+    
+    scheme = {
+      :type => :Tube, 
+      :mounts => {
+        2 => {
+          :mount_on => 3,
+          :type => :Tube,
+          :mounts => {
+            1 => {
+              :mount_on => 2,
+              :type => :Thruster,
+              :angle => 180,
+              :trigger => Gosu::KbD
+            },
+            0 => {
+              :mount_on => 2,
+              :type => :Thruster,
+              :angle => 0,
+              :trigger => Gosu::KbA
+            }
+          }
+        },
+        0 => {
+          :mount_on => 1,
+          :type => :Thruster,
+          :angle => -90,
+          :trigger => Gosu::KbW,
+          :mounts => {
+            0 => {
+              :mount_on => 2,
+              :type => :Thruster,
+              :angle => 0,
+              :trigger => Gosu::KbD
+            }
+          }
+        },
+        1 => {
+          :mount_on => 0,
+          :type => :Thruster,
+          :angle => -90,
+          :trigger => Gosu::KbW,
+          :mounts => {
+            1 => {
+              :mount_on => 2,
+              :type => :Thruster,
+              :angle => 180,
+              :trigger => Gosu::KbA
+            }
+          }
+        },
+        3 => {
+          :mount_on => 2,
+          :type => :Thruster,
+          :angle => 90,
+          :trigger => Gosu::KbS
+        }
+      },
+      :x => 180,
+      :y => 300
+    }
+    
+    build_from_scheme(scheme)
+  end
+  
+  def build_from_scheme(scheme, parent=nil, mount_point=nil)
+    module_class = Modules.const_get(scheme[:type].to_s)
+    
+    if(scheme[:x])
+      module_x = scheme[:x]
+    elsif parent
+      module_x = parent.shape.body.p.x
+    else
+      module_x = SCREEN_WIDTH / 2
+    end
+    
+    if(scheme[:y])
+      module_y = scheme[:y]
+    elsif parent
+      module_y = parent.shape.body.p.y
+    else
+      module_y = SCREEN_HEIGHT / 2
+    end
+    
+    if(scheme[:angle])
+      module_angle = scheme[:angle]
+    else
+      module_angle = 0
+    end
+    
+    if(scheme[:trigger])
+      module_trigger = scheme[:trigger]
+    else
+      module_trigger = Gosu::KbW
+    end
+    
+    module_entity = module_class.new(self, module_x, module_y, module_angle, module_trigger)
+    
+    if parent != nil and mount_point != nil and scheme[:mount_on] != nil
+      parent_loc = parent.shape.body.local2world(parent.mount_points[mount_point])
+      module_entity.shape.body.p = parent_loc - module_entity.mount_points[scheme[:mount_on]].rotate(module_entity.shape.body.rot)
+    end
+    
+    if scheme[:mounts]
+      scheme[:mounts].each_pair do |mount_point, child_scheme|
+        child = build_from_scheme(child_scheme, module_entity, mount_point)
+        @connections << Connection.new(module_entity, child)
+      end
+    end
+    
+    #module_entity.shape.group = 2
+    
+    @modules << module_entity
+    
+    return module_entity
+  end
+
+  def update
+    # Step the physics environment SUBSTEPS times each update
+    SUBSTEPS.times do     
+      clean_remove_queue
+      
+      (@modules+[@player]).each do |mod|
+        mod.update
+      end
+      
+      # Perform the step over @dt period of time
+      # For best performance @dt should remain consistent for the game
+      @space.step(@dt)
+    end
+    
+    @particle_system.update
+  end
+
+  def draw
+    @modules.each do |mod|
+      mod.draw
+    end
+    
+    @player.draw
+    
+    @font.draw("#{@modules[0].shape.body.p}", 10, 24, ZOrder::UI, 1.0, 1.0, 0xffffff00)
+    
+    @font.draw("X", mouse_x, mouse_y, ZOrder::UI, 1.0, 1.0, 0xffffff00)
+    
+    @particle_system.draw
+    draw_debug if $debug != 0
+  end
+  
+  def schedule_remove(object)
+    @remove_queue << object
+  end
+  
+  def clean_remove_queue
+    @remove_queue.each do |object|
+      if object.is_a? Projectiles::Rocket
+        @modules.delete object
+        @space.remove_body(object.shape.body)
+        @space.remove_shape(object.shape)
+      end
+    end
+    @remove_queue.clear
+  end
+
+  def button_down(id)
+    if id == Gosu::KbEscape
+      close
+    elsif id == Gosu::KbV
+      @modules.each do |mod|
+        mod.shape.body.velocity_func() { |body, gravity, damping, dt|
+          body.update_velocity(gravity, 0.99, dt)
+        }
+      end
+    elsif id == Gosu::KbZ
+      $debug = ($debug + 1) % 3
+    elsif id == Gosu::MsLeft
+      #mouse = CP::Vec2.new(mouse_x, mouse_y)
+      #@modules.each do |mod|
+      #  force_multiplier = 1500.0
+      #  diff = mod.shape.body.p - mouse
+      #  length = diff.length
+      #  dir = diff.normalize
+      #  
+      #  mod.shape.body.apply_impulse(dir * ((1.0/length) * force_multiplier), CP::Vec2.new(0.0, 0.0))
+        #float forceMultiplier = (some number, I used 1000);
+        #cpVect diff = cpvsub(bLoc, cLoc);
+        #cpFloat len = cpvlength(diff);
+        #cpVect dir = cpvnormalize(diff);
+      
+        #cpApplyImpulse(ballBody, cpvmult(normalized, 1.0f/len * forceMultiplier);
+      #end
+      
+      @modules << Projectiles::Rocket.new(self, mouse_x, mouse_y, 0)
+    end
+  end
+  
+  def button_up(id)
+    if id == Gosu::KbV
+      @modules.each do |mod|
+        mod.shape.body.velocity_func()
+      end
+    end
+  end
+  
+  def draw_debug
+    (@modules+[@player]).each do |mod|
+      rotate(mod.shape.body.a.radians_to_degrees, mod.shape.body.p.x, mod.shape.body.p.y) do
+        num_verts = mod.shape.num_verts
+        (0...num_verts).each do |vert_i|
+          x = mod.shape.body.p.x
+          y = mod.shape.body.p.y
+          cur = mod.shape.vert(vert_i)
+          nxt = mod.shape.vert((vert_i+1)%num_verts)
+          draw_line(x+cur.x, y+cur.y, 0xffffff00, x+nxt.x, y+nxt.y, 0xffff00ff, ZOrder::UI)
+        end
+        
+        if $debug == 2
+          mod.mount_points.each_with_index do |mount_point, index|
+            vec = mod.shape.body.p + mount_point
+            @mount_point_image.draw_rot(vec.x, vec.y, ZOrder::UI, 0)
+            @font.draw(index.to_s, vec.x, vec.y, ZOrder::UI, 0.7, 0.7, 0xff0000ff)
+          end
+        end
+      end
+    end
+  
+    @space.cp_constraints.each do |cons|vector_a = cons.body_a.p+(cons.anchr1.rotate(cons.body_a.rot))
+      vector_b = cons.body_b.p+(cons.anchr2.rotate(cons.body_b.rot))
+      draw_line(vector_a.x, vector_a.y, 0xffff0000, vector_b.x, vector_b.y, 0xff00ff00, ZOrder::UI)
+    end
+  end
+end
+
+window = GameWindow.new
+window.show
