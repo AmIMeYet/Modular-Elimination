@@ -1,10 +1,11 @@
 module Modules
   class BasicModule
-    attr_reader :shape, :mount_points, :battery
+    attr_reader :shape, :mount_points, :battery, :data
     
     def initialize(window, x, y, angle=0, triggers={}, shape_array = [], mount_points = [], mass=10.0, moment=150.0)
       @window = window
       @triggers = triggers
+      @data = {:x => x, :y => y, :angle => angle}
       
       @mount_points = mount_points
       @battery = Battery.new(0)
@@ -58,6 +59,67 @@ module Modules
     end
     
     def draw
+    end
+=begin    
+y = {:type => :Cockpit, 
+        :mounts => {
+          2 => {
+            :mount_on => 3,
+            :type => :Tube,
+            :mounts => {
+              1 => {
+                :mount_on => 2,
+                :type => :Thruster,
+                :angle => 180,
+                :triggers => {Gosu::KbD => :thrust}
+              },
+              0 => {
+                :mount_on => 2,
+                :type => :Thruster,
+                :angle => 0,
+                :triggers => {Gosu::KbA => :thrust}
+                heb nu:
+                :triggers => {Gosu::KbA => {:function => :thrust}}
+              }
+            }
+          }
+        }
+      }
+=end
+    
+    
+    def to_scheme
+      type = self.class.name.split('::').last || self.class.name
+      triggers = @triggers
+      mounts_arr = @window.connection_manager.connections_from(self).map do |connection|
+        {connection.to.data[:parent_mount_point] => connection.to.to_scheme}
+      end
+      
+      mounts = {}
+      
+      mounts_arr.each do |hash|
+        mounts.merge!(hash)
+      end
+      
+      
+      #mount_on
+      #angle
+      
+      @data.delete(:parent_mount_point)
+      
+      hash = {
+        :type => type,
+        :triggers => triggers,
+        :mounts => mounts
+      }.merge(@data)
+      
+      return hash
+      
+      #return "#{type} + #{triggers} + #{mounts}"
+    end
+    
+    def add_data(hash)
+      @data.merge!(hash)
     end
     
     def to_s

@@ -1,5 +1,6 @@
 require 'gosu'
 require 'chipmunk'
+require 'yaml'
 
 require_relative 'particles.rb'
 require_relative 'projectiles.rb'
@@ -46,8 +47,6 @@ class Battery
     
     @level = level
     @level ||= @capacity # Set battery to full if not specified otherwise
-    
-    p "Battery#{__id__} set: #{capacity} (#{level})"
   end
   
   def add_power(power)
@@ -140,8 +139,16 @@ class Connection
     (@anchr_a == object)
   end
   
+  def from
+    @anchr_a
+  end
+  
   def to? object
     (@anchr_b == object)
+  end
+  
+  def to
+    @anchr_b
   end
   
   def to_s
@@ -392,9 +399,17 @@ class GameWindow < Gosu::Window
     
     if(scheme[:triggers])
       module_triggers = {}
-      scheme[:triggers].each_pair do |trigger, function|
-        module_triggers[trigger] = {:function => function}
-      end
+      #if scheme[:triggers].is_a? Array
+        scheme[:triggers].each_pair do |trigger, function|
+          if !function.is_a? Hash
+            module_triggers[trigger] = {:function => function}
+          else
+            module_triggers[trigger] = function
+          end
+        end
+      #else
+      #  module_triggers = scheme[:triggers]
+      #end
     else
       module_triggers = {} #Gosu::KbW
     end
@@ -404,6 +419,7 @@ class GameWindow < Gosu::Window
     if parent != nil and mount_point != nil and scheme[:mount_on] != nil
       parent_loc = parent.shape.body.local2world(parent.mount_points[mount_point])
       module_entity.shape.body.p = parent_loc - module_entity.mount_points[scheme[:mount_on]].rotate(module_entity.shape.body.rot)
+      module_entity.add_data({:parent_mount_point => mount_point, :mount_on => scheme[:mount_on]})
     end
     
     if scheme[:mounts]
@@ -418,6 +434,10 @@ class GameWindow < Gosu::Window
     @modules << module_entity
     
     return module_entity
+  end
+  
+  def save_to_scheme(entity)
+    entity.to_scheme
   end
 
   def update
@@ -475,6 +495,15 @@ class GameWindow < Gosu::Window
   end
 
   def button_down(id)
+    if id == Gosu::KbB
+      scheme = @cockpit.to_scheme
+      File.open('ship.yaml', 'w') do |out|
+        YAML.dump(scheme, out)
+      end
+    elsif id == Gosu::KbN
+      scheme = YAML::load_file('ship.yaml')
+      @cockpit = build_from_scheme(scheme)
+    end
     if id == Gosu::KbEscape
       close
     elsif id == Gosu::KbV
