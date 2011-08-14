@@ -1,6 +1,5 @@
 Ships:
-  Building
-  Loading/Saving
+  Edit triggers, stats, data
 
 Enemies:
   Ships

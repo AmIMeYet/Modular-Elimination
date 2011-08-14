@@ -103,6 +103,11 @@ module Scenes
       }
       
       scheme = YAML::load_file('ship.yaml')
+      
+      #@modules << Modules::Thruster.new(self, 200, 200, 0)
+      #@modules << Modules::Cockpit.new(self, 250, 200, 0)
+      #@modules << Modules::Tube.new(self, 350, 200, 0)
+      #@modules << Modules::Cannon.new(self, 400, 200, 0)
             
       @cockpit = build_from_scheme(scheme)
       
@@ -156,8 +161,8 @@ module Scenes
       module_entity = module_class.new(self, module_x, module_y, module_angle, module_triggers)
       
       if parent != nil and mount_point != nil and scheme[:mount_on] != nil
-        parent_loc = parent.shape.body.local2world(parent.mount_points[mount_point])
-        module_entity.shape.body.p = parent_loc - module_entity.mount_points[scheme[:mount_on]].rotate(module_entity.shape.body.rot)
+        parent_loc = parent.shape.body.local2world(parent.mount_points[mount_point].p)
+        module_entity.shape.body.p = parent_loc - module_entity.mount_points[scheme[:mount_on]].p.rotate(module_entity.shape.body.rot)
         module_entity.add_data({:parent_mount_point => mount_point, :mount_on => scheme[:mount_on]})
       end
       
@@ -184,13 +189,15 @@ module Scenes
       SUBSTEPS.times do     
         clean_remove_queue
         
-        @modules.each do |mod|
-          mod.update
-        end
+        
         
         # Perform the step over @dt period of time
         # For best performance @dt should remain consistent for the game
         @space.step(@dt)
+      end
+      
+      @modules.each do |mod|
+        mod.update
       end
       
       @particle_system.update
@@ -201,7 +208,7 @@ module Scenes
         mod.draw
       end
       
-      @font.draw("Particles: #{particle_system.particle_count}", 10, 10, ZOrder::UI, 1.0, 1.0, 0xffffff00)
+      @font.draw("Modules: #{@modules.length} - Particles: #{particle_system.particle_count}", 10, 10, ZOrder::UI, 1.0, 1.0, 0xffffff00)
       
       @font.draw("#{@modules[0].shape.body.p}", 10, 24, ZOrder::UI, 1.0, 1.0, 0xffffff00)
       
@@ -284,18 +291,19 @@ module Scenes
             nxt = mod.shape.vert((vert_i+1)%num_verts)
             @window.draw_line(x+cur.x, y+cur.y, 0xffffff00, x+nxt.x, y+nxt.y, 0xffff00ff, ZOrder::UI)
           end
-          
-          if $debug == 2
-            mod.mount_points.each_with_index do |mount_point, index|
-              vec = mod.shape.body.p + mount_point
-              @mount_point_image.draw_rot(vec.x, vec.y, ZOrder::UI, 0)
-              @font.draw(index.to_s, vec.x, vec.y, ZOrder::UI, 0.7, 0.7, 0xff0000ff)
-            end
+        end
+        
+        if $debug == 2
+          mod.mount_points.each do |mount_point|
+            @mount_point_image.draw_rot(mount_point.space_pos.x, mount_point.space_pos.y, ZOrder::UI, mod.shape.body.a.radians_to_gosu + mount_point.angle)
+            @font.draw(mount_point.index.to_s, mount_point.space_pos.x, mount_point.space_pos.y, ZOrder::UI, 0.7, 0.7, 0xff0000ff)
           end
         end
       end
     
-      @space.cp_constraints.each do |cons|vector_a = cons.body_a.p+(cons.anchr1.rotate(cons.body_a.rot))
+      @space.cp_constraints.each do |cons|
+        next if cons.is_a?CP::Constraint::GearJoint
+        vector_a = cons.body_a.p+(cons.anchr1.rotate(cons.body_a.rot))
         vector_b = cons.body_b.p+(cons.anchr2.rotate(cons.body_b.rot))
         @window.draw_line(vector_a.x, vector_a.y, 0xffff0000, vector_b.x, vector_b.y, 0xff00ff00, ZOrder::UI)
       end

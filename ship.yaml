@@ -99,6 +99,7 @@
         :triggers: 
           115: 
             :function: :fire
+            :value: false
         :mounts: {}
 
         :x: 220.0001185056907
@@ -111,6 +112,7 @@
         :triggers: 
           115: 
             :function: :fire
+            :value: false
         :mounts: {}
 
         :x: 140.00011850642093

@@ -1,25 +1,6 @@
 module Scenes
 
-  class ShipEditorScene < BasicScene
-    class MountPointStub
-      attr_reader :pos, :object, :index
-      attr_accessor :s
-      def initialize(pos, object, index)
-        @pos = pos
-        @object = object
-        @index = index
-        @s = 1
-      end
-      
-      def x
-        @pos.x
-      end
-      
-      def y
-        @pos.y
-      end
-    end
-  
+  class ShipEditorScene < BasicScene  
     def initialize(window, previous_scene)
       super(window)
       
@@ -42,7 +23,14 @@ module Scenes
       @selected_end_x = 0
       @selected_rotation = 0
       
-      update_mount_points
+      @mount_points = []
+      
+      @modules.each do |mod|
+        #mod.mount_points.each do |mount_point|
+        #  @mount_points << mount_point
+        #end
+        @mount_points += mod.mount_points
+      end
     end
     
     def update
@@ -52,14 +40,13 @@ module Scenes
           @selected.shape.body.p.y = @window.mouse_y + @selected_offset_y
           @previous_scene.space.rehash_shape(@selected.shape)
           
-          @selected.mount_points.each do |mp1|
-            loc = @selected.shape.body.local2world(mp1)
-            @mount_points.each do |mp2|
-              if Gosu.distance(loc.x, loc.y, mp2.x, mp2.y) < 5
-                mp2.s = 3
-              end
-            end
-          end
+          #@selected.mount_points.each do |mp1|
+          #  @mount_points.each do |mp2|
+          #    if Gosu.distance(mp1.space_pos.x, mp1.space_pos.y, mp2.space_pos.x, mp2.space_pos.y) < 5
+          #      mp2.s = 3
+          #    end
+          #  end
+          #end
         elsif button_down?(Gosu::MsRight)
           @selected.shape.body.a = Gosu.angle(@selected.shape.body.p.x, @selected.shape.body.p.y, @window.mouse_x + @selected_offset_x, @window.mouse_y + @selected_offset_y).gosu_to_radians
           @previous_scene.space.rehash_shape(@selected.shape)
@@ -87,7 +74,7 @@ module Scenes
         end
         
         @mount_points.each do |mp|
-          @mount_point_image.draw_rot(mp.pos.x, mp.pos.y, render_depth+ZOrder::UI, 0, 0.5, 0.5, mp.s, mp.s)
+          @mount_point_image.draw_rot(mp.space_pos.x, mp.space_pos.y, render_depth+ZOrder::UI, 0, 0.5, 0.5, mp.s, mp.s)
           mp.s = 1
         end
         
@@ -101,8 +88,7 @@ module Scenes
         
       if @selected
         @selected.mount_points.each do |mount_point|
-          vec = @selected.shape.body.local2world(mount_point)
-          @mount_point_image.draw_rot(vec.x, vec.y, render_depth+ZOrder::UI, 0)
+          @mount_point_image.draw_rot(mount_point.space_pos.x, mount_point.space_pos.y, render_depth+ZOrder::UI, 0)
           #@font.draw(index.to_s, vec.x, vec.y, render_depth+ZOrder::UI, 0.7, 0.7, 0xff0000ff)
         end
       end
@@ -128,16 +114,6 @@ module Scenes
       end
     end
     
-    def update_mount_points
-      @mount_points = []
-      
-      @modules.each do |mod|
-        mod.mount_points.each_with_index do |mount_point, index|
-          @mount_points << MountPointStub.new(mod.shape.body.local2world(mount_point), mod, index)
-        end
-      end
-    end
-    
     def start_drag shape
       if shape && shape.body.object.data[:compatible]
         @selected = shape
@@ -151,7 +127,6 @@ module Scenes
         @mount_points.delete_if do |mp|
           mp.object == @selected
         end
-        #p "Dragging #{@selected}"
       end
     end
     
@@ -159,39 +134,30 @@ module Scenes
       if @selected
         if (@selected.shape.body.p.x - @selected_start_x).abs  > 10 || (@selected.shape.body.p.y - @selected_start_y).abs  > 10 || (@selected.shape.body.a - @selected_rotation).abs > 1
           @previous_scene.connection_manager.remove_for_object(@selected)
-          p "BREAK"
         end
         
-        @selected.mount_points.each_with_index do |mp1, mp1_index|
-          loc = @selected.shape.body.local2world(mp1)
+        @selected.mount_points.each do |mp1|
           @mount_points.each do |mp2|
-            if Gosu.distance(loc.x, loc.y, mp2.x, mp2.y) < 5
-              #mp2.s = 3
-              @previous_scene.connection_manager.disconnect(mp2.object, @selected)
+            if Gosu.distance(mp1.space_pos.x, mp1.space_pos.y, mp2.space_pos.x, mp2.space_pos.y) < 5
+              @previous_scene.connection_manager.remove_for_object(@selected)#disconnect(mp2.object, @selected)
               
-              #parent_loc = parent.shape.body.local2world(parent.mount_points[mount_point])
-              #module_entity.shape.body.p = parent_loc - module_entity.mount_points[scheme[:mount_on]].rotate(module_entity.shape.body.rot)
-              #module_entity.add_data({:parent_mount_point => mount_point, :mount_on => scheme[:mount_on]})
+              other_angle = (mp2.object.shape.body.a + mp2.angle.degrees_to_radians)
+              @selected.shape.body.a = (other_angle - 180.degrees_to_radians) - mp1.angle.degrees_to_radians
               
-              #mp2_loc = mp2.object.shape.body.local2world(mp2.pos)
-              @selected.shape.body.p = mp2.pos - mp1.rotate(@selected.shape.body.rot)
-              @selected.add_data({:x => @selected.shape.body.p.x, :y => @selected.shape.body.p.y, :angle => @selected.shape.body.a.radians_to_degrees, :parent_mount_point => mp2.index, :mount_on => mp1_index})
+              @selected.shape.body.p = mp2.space_pos - mp1.p.rotate(@selected.shape.body.rot)
+              @selected.add_data({:x => @selected.shape.body.p.x, :y => @selected.shape.body.p.y, :angle => @selected.shape.body.a.radians_to_degrees, :parent_mount_point => mp2.index, :mount_on => mp1.index})
+              
+              @previous_scene.space.rehash_shape(@selected.shape)
               
               @previous_scene.connection_manager.connect(mp2.object, @selected)
-              p "connected"
+              p "Connected #{@selected} with #{mp2.object}"
             end
           end
         end
         
-        #@selected.shape.body.a += 0.1
-        update_mount_points
+        @mount_points += @selected.mount_points
       end
       @selected = nil
-      #@selected_offset_x = 0
-      #@selected_offset_y = 0
-      #@selected_start_x = 0
-      #@selected_start_y = 0
-      #p "Stopped dragging"
     end
   end
   
