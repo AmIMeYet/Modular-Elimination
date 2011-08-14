@@ -1,15 +1,16 @@
 module Projectiles
   class Rocket
-    attr_reader :shape, :mount_points
+    attr_reader :shape, :mount_points, :data
     
     MOUNT_POINTS = []
     THRUST_POINT = CP::Vec2.new(-10, 0)
     
-    def initialize(window, x, y, angle=0, velocity=CP::Vec2::ZERO,trigger=nil)
-      @window = window
+    def initialize(scene, x, y, angle=0, velocity=CP::Vec2::ZERO,trigger=nil)
+      @scene = scene
       @trigger = trigger
       
       @mount_points = MOUNT_POINTS
+      @data = {}
       
       @spawn_time = Time.now
       
@@ -26,10 +27,10 @@ module Projectiles
       @shape.body.a = angle.degrees_to_radians
       @shape.body.object = self
       
-      window.space.add_body(body)
-      window.space.add_shape(shape)
+      scene.space.add_body(body)
+      scene.space.add_shape(shape)
       
-      @image = window.particle_system.gfx[:rocket]
+      @image = scene.particle_system.gfx[:rocket]
     end
     
     def update
@@ -37,14 +38,14 @@ module Projectiles
         @shape.body.apply_impulse(@shape.body.a.radians_to_vec2 * (30.0 / SUBSTEPS), CP::Vec2.new(0.0, 0.0))
         if rand(100) < 50
           point = @shape.body.local2world(THRUST_POINT)
-          Particles::ExaustFire.new(@window, point.x, point.y, @shape.body.a.radians_to_gosu-180)
+          Particles::ExaustFire.new(@scene, point.x, point.y, @shape.body.a.radians_to_gosu-180)
         end
-      elsif Time.now - @spawn_time > 260 # One minute to live
-        @window.schedule_remove(self)
+      elsif Time.now - @spawn_time > 3 # One minute to live
+        @scene.schedule_remove(self)
       end
     end
     
-    def draw()
+    def draw(render_depth=0)
       @image.draw_rot(@shape.body.p.x, @shape.body.p.y, ZOrder::Player, @shape.body.a.radians_to_gosu)
     end
     

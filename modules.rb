@@ -2,10 +2,10 @@ module Modules
   class BasicModule
     attr_reader :shape, :mount_points, :battery, :data
     
-    def initialize(window, x, y, angle=0, triggers={}, shape_array = [], mount_points = [], mass=10.0, moment=150.0)
-      @window = window
+    def initialize(scene, x, y, angle=0, triggers={}, shape_array = [], mount_points = [], mass=10.0, moment=150.0)
+      @scene = scene
       @triggers = triggers
-      @data = {:x => x, :y => y, :angle => angle}
+      @data = {:x => x, :y => y, :angle => angle, :compatible => true}
       
       @mount_points = mount_points
       @battery = Battery.new(0)
@@ -21,8 +21,8 @@ module Modules
       @shape.body.a = angle.degrees_to_radians
       @shape.body.object = self
       
-      window.space.add_body(body)
-      window.space.add_shape(shape)
+      scene.space.add_body(body)
+      scene.space.add_shape(shape)
       
       @last_power = 0.0
     end
@@ -43,7 +43,7 @@ module Modules
           @triggers[trigger_code][:value] = trigger_value
         end
         
-        @window.connection_manager.connections_from(self).each do |connection|
+        @scene.connection_manager.connections_from(self).each do |connection|
           connection.trigger(trigger_code, trigger_value)
         end
       end
@@ -58,7 +58,7 @@ module Modules
     def update
     end
     
-    def draw
+    def draw(render_depth=0)
     end
 =begin    
 y = {:type => :Cockpit, 
@@ -91,7 +91,7 @@ y = {:type => :Cockpit,
     def to_scheme
       type = self.class.name.split('::').last || self.class.name
       triggers = @triggers
-      mounts_arr = @window.connection_manager.connections_from(self).map do |connection|
+      mounts_arr = @scene.connection_manager.connections_from(self).map do |connection|
         {connection.to.data[:parent_mount_point] => connection.to.to_scheme}
       end
       
@@ -132,15 +132,15 @@ y = {:type => :Cockpit,
     MOUNT_POINTS = [CP::Vec2.new(-25.0, 0.0), CP::Vec2.new(25.0, 0.0), CP::Vec2.new(0.0, 25.0), CP::Vec2.new(0.0, -25.0)]
     SHAPE_ARRAY = [CP::Vec2.new(-25.0, -25.0), CP::Vec2.new(-25.0, 25.0), CP::Vec2.new(25.0, 25.0), CP::Vec2.new(25.0, -25.0)]
     
-    def initialize(window, x, y, angle=0, triggers={})
-      super(window, x, y, angle, triggers, SHAPE_ARRAY, MOUNT_POINTS)
+    def initialize(scene, x, y, angle=0, triggers={})
+      super(scene, x, y, angle, triggers, SHAPE_ARRAY, MOUNT_POINTS)
       set_battery(200)
       
-      @image = Gosu::Image.new(window, "media/cockpit.png", false)
+      @image = Gosu::Image.new(scene.window, "media/cockpit.png", false)
     end
     
     def start_trigger(trigger_code, trigger_value)
-      @window.connection_manager.connections_from(self).each do |connection|
+      @scene.connection_manager.connections_from(self).each do |connection|
         connection.trigger(trigger_code, trigger_value)
       end
     end
@@ -162,12 +162,12 @@ y = {:type => :Cockpit,
       start_trigger(:POWER_SOURCE, @battery) if @battery.percentage > 2
     end
     
-    def draw()
-      @image.draw_rot(@shape.body.p.x, @shape.body.p.y, ZOrder::Player, @shape.body.a.radians_to_gosu - 90)
+    def draw(render_depth=0)
+      @image.draw_rot(@shape.body.p.x, @shape.body.p.y, render_depth+ZOrder::Player, @shape.body.a.radians_to_gosu - 90)
       red = Gosu::Color.new(255, 255, 0, 0)
       green = Gosu::Color.new(255, 0, 255, 0)
-      @window.draw_quad(@shape.body.p.x, @shape.body.p.y, red, @shape.body.p.x + 10, @shape.body.p.y, red, @shape.body.p.x + 10, @shape.body.p.y + 50, red, @shape.body.p.x, @shape.body.p.y + 50, red, ZOrder::UI)
-      @window.draw_quad(@shape.body.p.x, @shape.body.p.y + (50 - (0.5*@battery.percentage)), green, @shape.body.p.x + 10, @shape.body.p.y + (50 - (0.5*@battery.percentage)), green, @shape.body.p.x + 10, @shape.body.p.y + 50, green, @shape.body.p.x, @shape.body.p.y + 50, green, ZOrder::UI)
+      @scene.window.draw_quad(@shape.body.p.x, @shape.body.p.y, red, @shape.body.p.x + 10, @shape.body.p.y, red, @shape.body.p.x + 10, @shape.body.p.y + 50, red, @shape.body.p.x, @shape.body.p.y + 50, red, ZOrder::UI)
+      @scene.window.draw_quad(@shape.body.p.x, @shape.body.p.y + (50 - (0.5*@battery.percentage)), green, @shape.body.p.x + 10, @shape.body.p.y + (50 - (0.5*@battery.percentage)), green, @shape.body.p.x + 10, @shape.body.p.y + 50, green, @shape.body.p.x, @shape.body.p.y + 50, green, ZOrder::UI)
     end
   end
 
@@ -175,14 +175,14 @@ y = {:type => :Cockpit,
     MOUNT_POINTS = [CP::Vec2.new(-35.0, 0.0), CP::Vec2.new(35.0, 0.0), CP::Vec2.new(0.0, 25.0), CP::Vec2.new(0.0, -25.0)]
     SHAPE_ARRAY = [CP::Vec2.new(-35.0, -25.0), CP::Vec2.new(-35.0, 25.0), CP::Vec2.new(35.0, 25.0), CP::Vec2.new(35.0, -25.0)]
     
-    def initialize(window, x, y, angle=0, triggers={})
-      super(window, x, y, angle, triggers, SHAPE_ARRAY, MOUNT_POINTS)
+    def initialize(scene, x, y, angle=0, triggers={})
+      super(scene, x, y, angle, triggers, SHAPE_ARRAY, MOUNT_POINTS)
       
-      @image = Gosu::Image.new(window, "media/tube.png", false)
+      @image = Gosu::Image.new(scene.window, "media/tube.png", false)
     end
     
-    def draw()
-      @image.draw_rot(@shape.body.p.x, @shape.body.p.y, ZOrder::Player, @shape.body.a.radians_to_gosu - 90)
+    def draw(render_depth=0)
+      @image.draw_rot(@shape.body.p.x, @shape.body.p.y, render_depth+ZOrder::Player, @shape.body.a.radians_to_gosu - 90)
     end
   end
   
@@ -193,11 +193,11 @@ y = {:type => :Cockpit,
     SHAPE_ARRAY = [CP::Vec2.new(-15.0, -15.0), CP::Vec2.new(-15.0, 15.0), CP::Vec2.new(10.0, 15.0), CP::Vec2.new(10.0, -15.0)]
     THRUST_POINT = CP::Vec2.new(-10, 0)
     
-    def initialize(window, x, y, angle=0, triggers={Gosu::KbW => {:function => :thrust}})
-      super(window, x, y, angle, triggers, SHAPE_ARRAY, MOUNT_POINTS)
+    def initialize(scene, x, y, angle=0, triggers={Gosu::KbW => {:function => :thrust}})
+      super(scene, x, y, angle, triggers, SHAPE_ARRAY, MOUNT_POINTS)
       set_battery(100)
       
-      @image = Gosu::Image.new(window, "media/thruster.png", false)
+      @image = Gosu::Image.new(scene.window, "media/thruster.png", false)
       
       @states = {:thrust => 0.0}
     end
@@ -215,20 +215,20 @@ y = {:type => :Cockpit,
       if @states[:thrust] >= 0.1
         @states[:thrust] -= 0.1
         point = @shape.body.local2world(THRUST_POINT)
-        Particles::ExaustFire.new(@window, point.x, point.y, @shape.body.a.radians_to_gosu-180) if rand(100) < 10
+        Particles::ExaustFire.new(@scene, point.x, point.y, @shape.body.a.radians_to_gosu-180) if rand(100) < 10
       else
         @states[:thrust] = 0.0
       end
     end
     
-    def draw()
-      @image.draw_rot(@shape.body.p.x, @shape.body.p.y, ZOrder::Player, @shape.body.a.radians_to_gosu, 0.5, 0.5, 1, 1,
+    def draw(render_depth=0)
+      @image.draw_rot(@shape.body.p.x, @shape.body.p.y, render_depth+ZOrder::Player, @shape.body.a.radians_to_gosu, 0.5, 0.5, 1, 1,
        Gosu::Color.new(255, 255, (255 - (100 * @states[:thrust])).to_i, (255 - (100 * @states[:thrust])).to_i))
       red = Gosu::Color.new(255, 255, 0, 0)
       green = Gosu::Color.new(255, 0, 255, 0)
-      @window.draw_quad(@shape.body.p.x, @shape.body.p.y, red, @shape.body.p.x + 10, @shape.body.p.y, red, @shape.body.p.x + 10, @shape.body.p.y + 50, red, @shape.body.p.x, @shape.body.p.y + 50, red, ZOrder::UI)
-      @window.draw_quad(@shape.body.p.x, @shape.body.p.y + (50 - (0.5*@battery.percentage)), green, @shape.body.p.x + 10, @shape.body.p.y + (50 - (0.5*@battery.percentage)), green, @shape.body.p.x + 10, @shape.body.p.y + 50, green, @shape.body.p.x, @shape.body.p.y + 50, green, ZOrder::UI)
-      @window.font.draw(@last_power.to_f.round(3), @shape.body.p.x, @shape.body.p.y, ZOrder::UI, 0.5, 0.5, 0xff0000ff)
+      @scene.window.draw_quad(@shape.body.p.x, @shape.body.p.y, red, @shape.body.p.x + 10, @shape.body.p.y, red, @shape.body.p.x + 10, @shape.body.p.y + 50, red, @shape.body.p.x, @shape.body.p.y + 50, red, ZOrder::UI)
+      @scene.window.draw_quad(@shape.body.p.x, @shape.body.p.y + (50 - (0.5*@battery.percentage)), green, @shape.body.p.x + 10, @shape.body.p.y + (50 - (0.5*@battery.percentage)), green, @shape.body.p.x + 10, @shape.body.p.y + 50, green, @shape.body.p.x, @shape.body.p.y + 50, green, ZOrder::UI)
+      @scene.font.draw(@last_power.to_f.round(3), @shape.body.p.x, @shape.body.p.y, ZOrder::UI, 0.5, 0.5, 0xff0000ff)
     end
   end
  
@@ -239,11 +239,11 @@ y = {:type => :Cockpit,
     SHAPE_ARRAY = [CP::Vec2.new(-15.0, -15.0), CP::Vec2.new(-15.0, 15.0), CP::Vec2.new(10.0, 15.0), CP::Vec2.new(10.0, -15.0)]
     THRUST_POINT = CP::Vec2.new(-30, 0)
     
-    def initialize(window, x, y, angle=0, triggers={Gosu::KbSpace => {:function => :fire}})
-      super(window, x, y, angle, triggers, SHAPE_ARRAY, MOUNT_POINTS)
+    def initialize(scene, x, y, angle=0, triggers={Gosu::KbSpace => {:function => :fire}})
+      super(scene, x, y, angle, triggers, SHAPE_ARRAY, MOUNT_POINTS)
       set_battery(100)
       
-      @image = Gosu::Image.new(window, "media/thruster.png", false)
+      @image = Gosu::Image.new(scene.window, "media/thruster.png", false)
       
       @states = {:timeout => 0.0}
     end
@@ -251,7 +251,7 @@ y = {:type => :Cockpit,
     def fire
       if @states[:timeout] <= 0.0 && @battery.draw_power(10)
         point = @shape.body.local2world(THRUST_POINT)
-        @window.modules << Projectiles::Rocket.new(@window, point.x, point.y, @shape.body.a.radians_to_gosu+90, @shape.body.v) 
+        @scene.modules << Projectiles::Rocket.new(@scene, point.x, point.y, @shape.body.a.radians_to_gosu+90, @shape.body.v) 
         @states[:timeout] += 10.0
       end
     end
@@ -261,13 +261,13 @@ y = {:type => :Cockpit,
       @states[:timeout] -= 0.1 if @states[:timeout] > 0.0
     end
     
-    def draw()
-      @image.draw_rot(@shape.body.p.x, @shape.body.p.y, ZOrder::Player, @shape.body.a.radians_to_gosu)
+    def draw(render_depth=0)
+      @image.draw_rot(@shape.body.p.x, @shape.body.p.y, render_depth+ZOrder::Player, @shape.body.a.radians_to_gosu)
       red = Gosu::Color.new(255, 255, 0, 0)
       green = Gosu::Color.new(255, 0, 255, 0)
-      @window.draw_quad(@shape.body.p.x, @shape.body.p.y, red, @shape.body.p.x + 10, @shape.body.p.y, red, @shape.body.p.x + 10, @shape.body.p.y + 50, red, @shape.body.p.x, @shape.body.p.y + 50, red, ZOrder::UI)
-      @window.draw_quad(@shape.body.p.x, @shape.body.p.y + (50 - (0.5*@battery.percentage)), green, @shape.body.p.x + 10, @shape.body.p.y + (50 - (0.5*@battery.percentage)), green, @shape.body.p.x + 10, @shape.body.p.y + 50, green, @shape.body.p.x, @shape.body.p.y + 50, green, ZOrder::UI)
-      @window.font.draw(@last_power.to_f.round(3), @shape.body.p.x, @shape.body.p.y, ZOrder::UI, 0.5, 0.5, 0xff0000ff)
+      @scene.window.draw_quad(@shape.body.p.x, @shape.body.p.y, red, @shape.body.p.x + 10, @shape.body.p.y, red, @shape.body.p.x + 10, @shape.body.p.y + 50, red, @shape.body.p.x, @shape.body.p.y + 50, red, ZOrder::UI)
+      @scene.window.draw_quad(@shape.body.p.x, @shape.body.p.y + (50 - (0.5*@battery.percentage)), green, @shape.body.p.x + 10, @shape.body.p.y + (50 - (0.5*@battery.percentage)), green, @shape.body.p.x + 10, @shape.body.p.y + 50, green, @shape.body.p.x, @shape.body.p.y + 50, green, ZOrder::UI)
+      @scene.font.draw(@last_power.to_f.round(3), @shape.body.p.x, @shape.body.p.y, ZOrder::UI, 0.5, 0.5, 0xff0000ff)
     end
   end
 end

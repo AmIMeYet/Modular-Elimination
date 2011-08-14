@@ -6,12 +6,12 @@ class Player
   
   MOUNT_POINTS = []
 
-  def initialize(window, shape)
+  def initialize(scene, shape)
     @mount_points = MOUNT_POINTS
   
-    @window = window
+    @scene = scene
     
-    @image = Gosu::Image.new(window, "media/Starfighter.bmp", false)
+    @image = Gosu::Image.new(@scene.window, "media/Starfighter.bmp", false)
     @shape = shape
     @shape.body.p = CP::Vec2.new(0.0, 0.0) # position
     @shape.body.v = CP::Vec2.new(0.0, 0.0) # velocity
@@ -64,13 +64,13 @@ class Player
     # Wrap around the screen to the other side
     validate_position
     
-    if @window.button_down? Gosu::KbUp
-      if ((@window.button_down? Gosu::KbRightShift) || (@window.button_down? Gosu::KbLeftShift))
+    if @scene.button_down? Gosu::KbUp
+      if ((@scene.button_down? Gosu::KbRightShift) || (@scene.button_down? Gosu::KbLeftShift))
         boost
       else
         accelerate
       end
-    elsif @window.button_down? Gosu::KbDown
+    elsif @scene.button_down? Gosu::KbDown
       reverse
     end
   
@@ -87,7 +87,7 @@ class Player
   end
 end
 
-class GameWindow < Gosu::Window
+class SpaceScene < BasicScene
   def add_player
     # Create the Body for the Player
     body = CP::Body.new(10.0, 150.0)

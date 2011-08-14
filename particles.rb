@@ -1,8 +1,8 @@
 module Particles
   class BasicParticle
-    attr_reader :window
-    def initialize(window, x, y, rotation=nil, angle=nil)
-      @window = window
+    attr_reader :scene
+    def initialize(scene, x, y, rotation=nil, angle=nil)
+      @scene = scene
       
       @x = x
       @y = y
@@ -12,20 +12,20 @@ module Particles
       
       @angle = angle
       
-      @window.particle_system.add_particle(self)
+      @scene.particle_system.add_particle(self)
     end
     
     def die
-      @window.particle_system.remove_particle(self)
+      @scene.particle_system.remove_particle(self)
     end    
   end
   
   class ExaustFire < BasicParticle
-    def initialize(window, x, y, angle=nil)
-      super(window, x, y, nil, angle)
+    def initialize(scene, x, y, angle=nil)
+      super(scene, x, y, nil, angle)
       
       @color = Gosu::Color.new(255,255,255,255)
-      @image = Gosu::Image.new(window,"media/fireball.png",false)
+      @image = scene.particle_system.gfx[:fireball]
     
       if rand > 0.5 then @left = true else @left = false end
     end
