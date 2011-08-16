@@ -145,7 +145,7 @@ module Scenes
               @selected.shape.body.a = (other_angle - 180.degrees_to_radians) - mp1.angle.degrees_to_radians
               
               @selected.shape.body.p = mp2.space_pos - mp1.p.rotate(@selected.shape.body.rot)
-              @selected.add_data({:x => @selected.shape.body.p.x, :y => @selected.shape.body.p.y, :angle => @selected.shape.body.a.radians_to_degrees, :parent_mount_point => mp2.index, :mount_on => mp1.index})
+              @selected.add_data({:parent_mount_point => mp2.index, :mount_on => mp1.index})
               
               @previous_scene.space.rehash_shape(@selected.shape)
               

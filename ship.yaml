@@ -3,129 +3,19 @@
 :triggers: {}
 
 :mounts: 
-  2: 
-    :type: Tube
-    :triggers: {}
-
-    :mounts: 
-      1: 
-        :type: Thruster
-        :triggers: 
-          100: 
-            :function: :thrust
-            :value: false
-        :mounts: {}
-
-        :x: 180.0
-        :y: 350.0
-        :angle: 180
-        :compatible: true
-        :mount_on: 2
-      0: 
-        :type: Thruster
-        :triggers: 
-          97: 
-            :function: :thrust
-            :value: false
-        :mounts: {}
-
-        :x: 180.0
-        :y: 350.0
-        :angle: 0
-        :compatible: true
-        :mount_on: 2
-    :x: 180.0
-    :y: 300.0
-    :angle: 0
-    :compatible: true
-    :mount_on: 3
-  0: 
-    :type: Thruster
+  ~: 
+    :type: Cannon
     :triggers: 
-      119: 
-        :function: :thrust
-        :value: false
-    :mounts: 
-      0: 
-        :type: Thruster
-        :triggers: 
-          100: 
-            :function: :thrust
-            :value: false
-        :mounts: {}
+      115: 
+        :function: :fire
+    :mounts: {}
 
-        :x: 140.0
-        :y: 300.0
-        :angle: 0
-        :compatible: true
-        :mount_on: 2
-    :x: 180.0
-    :y: 300.0
-    :angle: -90
-    :compatible: true
-    :mount_on: 1
-  1: 
-    :type: Thruster
-    :triggers: 
-      119: 
-        :function: :thrust
-        :value: false
-    :mounts: 
-      1: 
-        :type: Thruster
-        :triggers: 
-          97: 
-            :function: :thrust
-            :value: false
-        :mounts: {}
-
-        :x: 220.0
-        :y: 300.0
-        :angle: 180
-        :compatible: true
-        :mount_on: 2
-    :x: 180.0
-    :y: 300.0
-    :angle: -90
-    :compatible: true
-    :mount_on: 0
-  3: 
-    :type: Cockpit
-    :triggers: {}
-
-    :mounts: 
-      1: 
-        :type: Cannon
-        :triggers: 
-          115: 
-            :function: :fire
-            :value: false
-        :mounts: {}
-
-        :x: 220.0001185056907
-        :y: 250.00011850625242
-        :angle: 90.0
-        :compatible: true
-        :mount_on: 1
-      0: 
-        :type: Cannon
-        :triggers: 
-          115: 
-            :function: :fire
-            :value: false
-        :mounts: {}
-
-        :x: 140.00011850642093
-        :y: 249.99981039072637
-        :angle: 90.00027159568069
-        :compatible: true
-        :mount_on: 0
-    :x: 180.00011850597156
-    :y: 250.00000000028086
-    :angle: 0.0002715956806722564
+    :x: 150.91059283807184
+    :y: 199.5971798453185
+    :angle: 60.943501540920536
     :compatible: true
     :mount_on: 2
-:x: 180
-:y: 300
-:angle: 0
+:x: 167.90878541714002
+:y: 230.19249989968782
+:angle: -29.05632196966664
 :compatible: true

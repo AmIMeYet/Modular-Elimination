@@ -102,7 +102,7 @@ module Scenes
         :y => 300
       }
       
-      scheme = YAML::load_file('ship.yaml')
+      #scheme = YAML::load_file('ship.yaml')
       
       #@modules << Modules::Thruster.new(self, 200, 200, 0)
       #@modules << Modules::Cockpit.new(self, 250, 200, 0)
@@ -114,23 +114,27 @@ module Scenes
       @modules.each do |mod|
         @connection_manager.connections_from(mod).each do |con| con.test_loop end
       end
+      
+      @camera = Camera.new(self, @cockpit.shape.body.p.x, @cockpit.shape.body.p.y)
+      @camera.track(@cockpit)
     end
     
     def build_from_scheme(scheme, parent=nil, mount_point=nil)
       module_class = Modules.const_get(scheme[:type].to_s)
       
-      if(scheme[:x])
-        module_x = scheme[:x]
-      elsif parent
+      
+      if parent
         module_x = parent.shape.body.p.x
+      elsif(scheme[:x])
+        module_x = scheme[:x]
       else
         module_x = SCREEN_WIDTH / 2
       end
       
-      if(scheme[:y])
-        module_y = scheme[:y]
-      elsif parent
+      if parent
         module_y = parent.shape.body.p.y
+      elsif (scheme[:y])
+        module_y = scheme[:y]
       else
         module_y = SCREEN_HEIGHT / 2
       end
@@ -201,21 +205,24 @@ module Scenes
       end
       
       @particle_system.update
+      @camera.update
     end
 
     def draw
-      @modules.each do |mod|
-        mod.draw
+      @camera.draw do
+        @modules.each do |mod|
+          mod.draw
+        end
+        
+        #@font.draw("X", @window.mouse_x, @window.mouse_y, ZOrder::UI, 1.0, 1.0, 0xffffff00)
+        
+        @particle_system.draw
+        draw_debug if $debug != 0
       end
-      
+        
       @font.draw("Modules: #{@modules.length} - Particles: #{particle_system.particle_count}", 10, 10, ZOrder::UI, 1.0, 1.0, 0xffffff00)
       
       @font.draw("#{@modules[0].shape.body.p}", 10, 24, ZOrder::UI, 1.0, 1.0, 0xffffff00)
-      
-      #@font.draw("X", @window.mouse_x, @window.mouse_y, ZOrder::UI, 1.0, 1.0, 0xffffff00)
-      
-      @particle_system.draw
-      draw_debug if $debug != 0
     end
     
     def schedule_remove(object)
@@ -261,9 +268,9 @@ module Scenes
       when Gosu::KbZ
         $debug = ($debug + 1) % 3
       when Gosu::MsLeft
-        @modules << Projectiles::Rocket.new(self, @window.mouse_x, @window.mouse_y, 0)
+        @modules << Projectiles::Rocket.new(self, @camera.mouse_x, @camera.mouse_y, 0)
       when Gosu::MsRight
-        @modules << Modules::Thruster.new(self, @window.mouse_x, @window.mouse_y, 0)
+        @modules << Modules::Laser.new(self, @camera.mouse_x, @camera.mouse_y, 0)
       else
         @cockpit.start_trigger(id, true)
       end

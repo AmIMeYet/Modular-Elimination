@@ -287,6 +287,57 @@ class CP::Space
   end
 end
 
+class Camera
+  def initialize(scene, x, y, angle=0, scale_x=1, scale_y=2)
+    @window = scene.window
+    @pos = CP::Vec2.new(x, y)
+    #@x = x
+    #@y = y
+    @angle = angle
+    @scale_x = scale_x
+    @scale_y = scale_y
+    @body = nil
+  end
+  
+  def update
+    if @body
+      @pos = @pos.lerp(@body.p, 0.05)
+    end
+  end
+  
+  def draw(&drawing_code)
+    @window.translate (SCREEN_WIDTH/2) - @pos.x, (SCREEN_HEIGHT/2) - @pos.y do
+      yield
+    end
+  end
+  
+  def track(object)
+    @body = object.shape.body
+  end
+  
+  def x
+    @pos.x
+  end
+  
+  def y
+    @pos.y
+  end
+  
+  def mouse_x
+    @window.mouse_x - (SCREEN_WIDTH/2) + @pos.x
+  end
+  
+  def mouse_y
+    @window.mouse_y - (SCREEN_HEIGHT/2) + @pos.y
+  end
+end
+
+class Ship
+  def initialize(scene, schildren)
+    
+  end
+end
+
 class GameWindow < Gosu::Window  
   def initialize
     super(SCREEN_WIDTH, SCREEN_HEIGHT, false, 16)
