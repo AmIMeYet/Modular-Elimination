@@ -90,17 +90,17 @@ class Connection
     @anchr_a = anchr_a
     @anchr_b = anchr_b
     
-    constraint = CP::Constraint::PinJoint.new(anchr_a.shape.body, anchr_b.shape.body, CP::Vec2.new(0, 0), CP::Vec2.new(10, 0))
-    @constraints << constraint
-    @scene.space.add_constraint(constraint)
+    ##constraint = CP::Constraint::PinJoint.new(anchr_a.shape.body, anchr_b.shape.body, CP::Vec2.new(0, 0), CP::Vec2.new(10, 0))
+    ##@constraints << constraint
+    ##@scene.space.add_constraint(constraint)
     
-    constraint = CP::Constraint::PinJoint.new(anchr_a.shape.body, anchr_b.shape.body, CP::Vec2.new(10, 0), CP::Vec2.new(0, 0))
-    @constraints << constraint
-    @scene.space.add_constraint(constraint)
+    ##constraint = CP::Constraint::PinJoint.new(anchr_a.shape.body, anchr_b.shape.body, CP::Vec2.new(10, 0), CP::Vec2.new(0, 0))
+    ##@constraints << constraint
+    ##@scene.space.add_constraint(constraint)
     
-    constraint = CP::Constraint::PinJoint.new(anchr_a.shape.body, anchr_b.shape.body, CP::Vec2.new(0, 0), CP::Vec2.new(0, 10))
-    @constraints << constraint
-    @scene.space.add_constraint(constraint)
+    ##constraint = CP::Constraint::PinJoint.new(anchr_a.shape.body, anchr_b.shape.body, CP::Vec2.new(0, 0), CP::Vec2.new(0, 10))
+    ##@constraints << constraint
+    ##@scene.space.add_constraint(constraint)
 =begin    
     constraint = CP::Constraint::PinJoint.new(anchr_a.shape.body, anchr_b.shape.body, CP::Vec2.new(0, 10), CP::Vec2.new(10, 0))
     @constraints << constraint
@@ -288,7 +288,7 @@ class CP::Space
 end
 
 class Camera
-  def initialize(scene, x, y, angle=0, scale_x=1, scale_y=2)
+  def initialize(scene, x, y, angle=0, scale_x=1, scale_y=1)
     @window = scene.window
     @pos = CP::Vec2.new(x, y)
     #@x = x
@@ -306,13 +306,15 @@ class Camera
   end
   
   def draw(&drawing_code)
-    @window.translate (SCREEN_WIDTH/2) - @pos.x, (SCREEN_HEIGHT/2) - @pos.y do
-      yield
+    @window.scale(1/@scale_x, 1/@scale_y) do
+      @window.translate ((SCREEN_WIDTH/2) * @scale_x) - @pos.x, ((SCREEN_HEIGHT/2) * @scale_y) - @pos.y do
+        yield
+      end
     end
   end
   
-  def track(object)
-    @body = object.shape.body
+  def track(body)
+    @body = body
   end
   
   def x
@@ -330,11 +332,93 @@ class Camera
   def mouse_y
     @window.mouse_y - (SCREEN_HEIGHT/2) + @pos.y
   end
+  
+  def zoomin(x, y)
+    @scale_x *= 1.1
+    @scale_y *= 1.1
+  end
+  
+  def zoomout
+    @scale_x *= 0.9
+    @scale_y *= 0.9
+  end
 end
 
 class Ship
-  def initialize(scene, schildren)
+  attr_reader :body, :cockpit
+  def initialize(scene, x, y, angle)
+    @scene = scene
+    #@children = children
     
+    @body = CP::Body.new(0, 0)
+    @body.p = CP::Vec2.new(x, y) # position
+    @body.v = CP::Vec2.new(0.0, 0.0) # velocity
+    @body.a = angle.degrees_to_radians
+    scene.space.add_body(@body)
+    
+    @children = []
+    @cockpit = nil
+    
+    #update_ship
+  end
+  
+  def draw
+    @children.each { |child| child.draw }
+    @scene.particle_system.gfx[:fireball].draw_rot(@body.p.x, @body.p.y, 9999, 0)
+  end
+  
+  def update
+    @children.each { |child| child.update }
+  end
+  
+  def add_module(module_entity)
+    @children << module_entity
+    module_entity.offset = @body.p - module_entity.shape.body.p
+  end
+  
+  def remove_module(module_entity)
+    if @children.include? module_entity
+      @children.delete module_entity
+      module_entity.detach
+      #update_ship
+    end
+  end
+  
+  def set_cockpit
+    @children.each do |child|
+      if child.is_a? Modules::Cockpit
+        @cockpit = child
+        break
+      end
+    end
+  end
+  
+  def update_ship
+    avg_x = 0.0
+    avg_y = 0.0
+    mass_total = 0.0
+    inertia_total = 0.0
+    
+    @children.each do |child|
+      mass_total += child.shape.body.m
+      inertia_total += CP.moment_for_poly(child.shape.body.m, child.shape_verts, child.offset) #child.shape.body.i + child.shape.body.m*((cogOfShip - cogOfPiece).lengthsq)
+      avg_x += child.shape.body.m * child.offset.x
+      avg_y += child.shape.body.m * child.offset.y
+    end
+    avg_x /= mass_total
+    avg_y /= mass_total
+    new_body_position = @body.local2world(CP::Vec2.new(avg_x,avg_y))
+        
+    @body.p = new_body_position
+    @body.m = mass_total
+    @body.i = inertia_total
+    
+    @children.each do |child|
+      x = child.offset.x-avg_x
+      y = child.offset.y-avg_y
+      child.offset = CP::Vec2.new(x, y)
+      child.attach(self)
+    end
   end
 end
 
