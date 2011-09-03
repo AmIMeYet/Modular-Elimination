@@ -1,7 +1,7 @@
 module Scenes
 
   class SpaceScene < BasicScene
-    attr_reader :space, :particle_system, :connection_manager, :modules, :font
+    attr_reader :space, :particle_system, :connection_manager, :ships, :modules, :font, :camera
     def initialize(window)
       super
       
@@ -278,6 +278,8 @@ module Scenes
         File.open('ship.yaml', 'w') do |out|
           YAML.dump(scheme, out)
         end
+      when Gosu::KbU
+        @ships.each { |ship| ship.update_ship }
       when Gosu::KbN
         scheme = YAML::load_file('ship.yaml')
         @cockpit = build_from_scheme(scheme)

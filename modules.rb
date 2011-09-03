@@ -39,10 +39,11 @@ module Modules
     end
     
     def attach(ship)
-      detach if @ship
+      #detach if @ship # Why doesn't this work?
+      return if @ship
       
       @ship = ship
-      @data[:offset_angle] = CP::Vec2.for_angle(@shape.body.a - @ship.body.a + 180.degrees_to_radians)
+      @data[:offset_angle] = CP::Vec2.for_angle(@shape.body.a - @ship.body.a)
       
       @scene.space.remove_shape(@shape)
       @scene.space.remove_body(@body)
@@ -51,7 +52,6 @@ module Modules
       @shape.collision_type = :module
       @shape.object = self
       @scene.space.add_shape(@shape)
-      
       @scene.modules.delete(self)
     end
     
@@ -75,6 +75,8 @@ module Modules
         
         @scene.connection_manager.remove_for_object(self)
         @scene.modules << self
+        
+        p "sucessfully detached #{self.to_s}"
       end
     end
     
@@ -219,7 +221,11 @@ module Modules
     end
     
     def space_pos
-      @object.shape.body.local2world(@p)
+      if @object.attached?
+        @object.shape.body.local2world(@object.offset+(@p.rotate(@object.data[:offset_angle])))
+      else
+        @object.shape.body.local2world(@p)
+      end
     end
   end
   
