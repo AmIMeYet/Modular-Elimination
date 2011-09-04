@@ -175,13 +175,14 @@ module Scenes
       if parent != nil and mount_point != nil and scheme[:mount_on] != nil
         parent_loc = parent.shape.body.local2world(parent.mount_points[mount_point].p)
         module_entity.shape.body.p = parent_loc - module_entity.mount_points[scheme[:mount_on]].p.rotate(module_entity.shape.body.rot)
-        module_entity.add_data({:parent_mount_point => mount_point, :mount_on => scheme[:mount_on]})
+        #module_entity.add_data({:parent_mount_point => mount_point, :mount_on => scheme[:mount_on]})
+        parent.mount_on(mount_point, scheme[:mount_on], module_entity)
       end
       
       if scheme[:mounts]
         scheme[:mounts].each_pair do |mount_point, child_scheme|
           child = build_from_scheme(child_scheme, ship, module_entity, mount_point)
-          @connection_manager.connect(module_entity, child)
+          @connection_manager.connect(module_entity, child) # FIXME deprecated
         end
       end
       

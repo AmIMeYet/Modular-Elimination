@@ -1,7 +1,7 @@
 module Modules
   class BasicModule
     attr_reader :shape, :mount_points, :battery, :data, :shape_verts, :ship
-    attr_accessor :offset
+    attr_accessor :offset, :parent
     
     def initialize(scene, x, y, angle=0, triggers={}, shape_array = [], mount_points = [], mass=10.0, moment=150.0)
       @scene = scene
@@ -10,6 +10,7 @@ module Modules
       @shape_verts ||= shape_array
       @offset = CP::Vec2.new(0,0)
       @ship = nil
+      @parent = nil
       
       @mount_points = []
       mount_points.each_with_index do |mp, index|
@@ -34,8 +35,47 @@ module Modules
       @last_power = 0.0
     end
     
+    def mount_on(self_mp, child_mp, child)
+      @mount_points[self_mp].child = child
+      child.mount_points[child_mp].child = :parent
+      child.parent = self
+      p "Sucessfully mounted #{child} on #{self_mp}"
+    end
+    
+    def unmount(child)
+      p "Unmounting.."
+      @mount_points.each do |mp|
+        if mp.child == child
+          mp.child = nil
+          break
+        end
+      end
+      @mount_points.each do |mp|
+        if mp.child == :parent
+          mp.child = nil
+          break
+        end
+      end
+    end
+    
+    def mounted?
+      (@parent != nil)
+    end
+    
     def attached?
       (@ship != nil)
+    end
+    
+    def attach_to(ship)
+      if @ship
+        @ship.remove_module(self)
+      end
+      
+      ship.add_module(self)
+      
+      @mount_points.each do |mp|
+        mp.child.attach_to(ship) if mp.child.is_a? BasicModule
+      end
     end
     
     def attach(ship)
@@ -115,8 +155,14 @@ module Modules
         end
         
         # Retransmit
-        @scene.connection_manager.connections_from(self).each do |connection|
-          connection.trigger(trigger_code, trigger_value)
+        #@scene.connection_manager.connections_from(self).each do |connection|
+        #  connection.trigger(trigger_code, trigger_value)
+        #end
+        
+        @mount_points.each do |mp|
+          if mp.child.is_a? BasicModule
+            mp.child.trigger(trigger_code, trigger_value)
+          end
         end
       end
     end
@@ -203,12 +249,13 @@ module Modules
   
   class MountPoint
     attr_reader :p, :object, :index, :angle
-    attr_accessor :s # FIXME
+    attr_accessor :child, :s # FIXME
     def initialize(position, object, index, angle)
       @p = position
       @object = object
       @index = index
       @angle = angle
+      @child = nil
       @s = 1
     end
     
@@ -218,6 +265,10 @@ module Modules
     
     def y
       @p.y
+    end
+    
+    def occupied?
+      (@child != nil)
     end
     
     def space_pos
@@ -246,8 +297,13 @@ module Modules
     end
     
     def start_trigger(trigger_code, trigger_value)
-      @scene.connection_manager.connections_from(self).each do |connection|
-        connection.trigger(trigger_code, trigger_value)
+      #@scene.connection_manager.connections_from(self).each do |connection|
+      #  connection.trigger(trigger_code, trigger_value)
+      #end
+      @mount_points.each do |mp|
+        if mp.child.is_a? BasicModule
+          mp.child.trigger(trigger_code, trigger_value)
+        end
       end
     end
     

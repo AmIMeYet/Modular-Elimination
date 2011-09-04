@@ -142,6 +142,7 @@ module Scenes
           ship = @selected.object.ship
           ship.remove_module(@selected.object)  #@selected.object.detach
           ship.update_ship
+          @selected.object.parent.unmount(@selected.object) if @selected.object.mounted?
         end
           
           
@@ -161,6 +162,7 @@ module Scenes
     
     def end_drag
       if @selected
+        # TODO: only mount once and when movement is > .. or whatever
         if (@selected.shape.body.p.x - @selected_start_x).abs  > 10 || (@selected.shape.body.p.y - @selected_start_y).abs  > 10 || (@selected.shape.body.a - @selected_rotation).abs > 1
           @previous_scene.connection_manager.remove_for_object(@selected)
         end
@@ -174,13 +176,18 @@ module Scenes
               @selected.shape.body.a = (other_angle - 180.degrees_to_radians) - mp1.angle.degrees_to_radians
               
               @selected.shape.body.p = mp2.space_pos - mp1.p.rotate(@selected.shape.body.rot)
-              @selected.add_data({:parent_mount_point => mp2.index, :mount_on => mp1.index})
+              #@selected.add_data({:parent_mount_point => mp2.index, :mount_on => mp1.index})
+              
+              #Actually mount!
+              @selected.mount_on(mp2.index, mp1.index, @selected)
               
               if mp2.object.attached?
                 p "ship is attached"
                 #@selected.attach(mp2.object.ship)
                 mp2.object.ship.add_module(@selected)
                 mp2.object.ship.update_ship
+              else
+                @selected.attach_to(mp2.object.ship)
               end
               
               @previous_scene.space.rehash_shape(@selected.shape)
