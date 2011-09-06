@@ -25,10 +25,15 @@ class Ship
     @children.each { |child| child.update }
   end
   
+  def bloody_unmount_all!
+    @children.each { |child| child.detach }
+  end
+  
   def add_module(module_entity)
     @children << module_entity
     p "module was attached? #{module_entity.attached?}"
     module_entity.offset = @body.world2local(module_entity.shape.body.p) #@body.local2world(@offset+(THRUST_POINT.rotate(@data[:offset_angle]))) #@body.p - module_entity.shape.body.p
+    module_entity.relative_offset = @body.world2local(module_entity.shape.body.p)
   end
   
   def remove_module(module_entity)
@@ -75,6 +80,7 @@ class Ship
     @body.i = inertia_total
     
     @children.each do |child|
+      p "#{child}: #{child.relative_offset} #{child.offset}"
       x = child.offset.x-avg_x
       y = child.offset.y-avg_y
       child.offset = CP::Vec2.new(x, y)

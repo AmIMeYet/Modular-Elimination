@@ -1,7 +1,7 @@
 module Modules
   class BasicModule
     attr_reader :shape, :mount_points, :battery, :data, :shape_verts, :ship
-    attr_accessor :offset, :parent
+    attr_accessor :offset, :relative_offset, :parent
     
     def initialize(scene, x, y, angle=0, triggers={}, shape_array = [], mount_points = [], mass=10.0, moment=150.0)
       @scene = scene
@@ -9,6 +9,7 @@ module Modules
       @data = {:compatible => true, :offset_angle => CP::Vec2.new(0,0)}
       @shape_verts ||= shape_array
       @offset = CP::Vec2.new(0,0)
+      @relative_offset = CP::Vec2.new(0,0)
       @ship = nil
       @parent = nil
       
@@ -36,6 +37,9 @@ module Modules
     end
     
     def mount_on(self_mp, child_mp, child)
+      p self
+      p self_mp, child_mp, child
+      p @mount_points.length
       @mount_points[self_mp].child = child
       child.mount_points[child_mp].child = :parent
       child.parent = self
@@ -43,7 +47,6 @@ module Modules
     end
     
     def unmount(child)
-      p "Unmounting.."
       @mount_points.each do |mp|
         if mp.child == child
           mp.child = nil
@@ -80,13 +83,13 @@ module Modules
     
     def attach(ship)
       #detach if @ship # Why doesn't this work?
-      return if @ship
-      
+      #return if @ship
+      had_ship = @ship != nil
       @ship = ship
-      @data[:offset_angle] = CP::Vec2.for_angle(@shape.body.a - @ship.body.a)
+      @data[:offset_angle] = CP::Vec2.for_angle(@shape.body.a - @ship.body.a) unless had_ship
       
-      @scene.space.remove_shape(@shape)
-      @scene.space.remove_body(@body)
+      @scene.space.remove_shape(@shape)# unless @ship
+      @scene.space.remove_body(@body)# unless @ship
       
       @shape = CP::Shape::Poly.new(@ship.body, @shape_verts.map { |vert| vert.rotate(@data[:offset_angle])}, @offset) #
       @shape.collision_type = :module
@@ -110,10 +113,11 @@ module Modules
         @scene.space.add_body(@body)
         
         @ship = nil
-        @data[:offset_angle] = CP::Vec2.new(0,0)
+        @data[:offset_angle] = CP::Vec2.new(1,0)
         @offset = CP::Vec2.new(0,0)
+        @relative_offset = CP::Vec2.new(0,0)
         
-        @scene.connection_manager.remove_for_object(self)
+        #@scene.connection_manager.remove_for_object(self)
         @scene.modules << self
         
         p "sucessfully detached #{self.to_s}"
@@ -158,11 +162,11 @@ module Modules
         #@scene.connection_manager.connections_from(self).each do |connection|
         #  connection.trigger(trigger_code, trigger_value)
         #end
+      end
         
-        @mount_points.each do |mp|
-          if mp.child.is_a? BasicModule
-            mp.child.trigger(trigger_code, trigger_value)
-          end
+      @mount_points.each do |mp|
+        if mp.child.is_a? BasicModule
+          mp.child.trigger(trigger_code, trigger_value)
         end
       end
     end
@@ -212,8 +216,9 @@ module Modules
     def to_scheme
       type = self.class.name.split('::').last || self.class.name
       triggers = @triggers
-      mounts_arr = @scene.connection_manager.connections_from(self).map do |connection|
-        {connection.to.data[:parent_mount_point] => connection.to.to_scheme}
+      mounts_arr = @mount_points.map do |mp| #@scene.connection_manager.connections_from(self).map do |connection|
+        #{connection.to.data[:parent_mount_point] => connection.to.to_scheme}
+        {mp.child.data[:parent_mount_point] => mp.child.to_scheme}
       end
       
       mounts = {}
@@ -405,7 +410,7 @@ module Modules
       [CP::Vec2.new(10.0, 0), 0]
     ]
     SHAPE_ARRAY = [CP::Vec2.new(-15.0, -15.0), CP::Vec2.new(-15.0, 15.0), CP::Vec2.new(10.0, 15.0), CP::Vec2.new(10.0, -15.0)]
-    THRUST_POINT = CP::Vec2.new(-30, 0)
+    THRUST_POINT = CP::Vec2.new(-40, 0)
     
     def initialize(scene, x, y, angle=0, triggers={Gosu::KbSpace => {:function => :fire}})
       super(scene, x, y, angle, triggers, SHAPE_ARRAY, MOUNT_POINTS)
@@ -431,6 +436,8 @@ module Modules
     
     def do_draw(x, y, a, render_depth=0)
       @image.draw_rot(x, y, render_depth+ZOrder::Player, a.radians_to_gosu)
+      point = get_point(THRUST_POINT)
+      @scene.window.draw_line(point.x, point.y, Gosu::Color::RED, get_p.x, get_p.y, Gosu::Color::RED, render_depth+ZOrder::UI+33333999999876543)
       draw_battery
     end
   end
@@ -473,7 +480,7 @@ module Modules
     def update
       #handle_triggers
       #@states[:timeout] -= 0.1 if @states[:timeout] > 0
-      if @scene.window.button_down? Gosu::KbSpace
+      if @scene.window.button_down? Gosu::KbM
         fire
       elsif @states[:firing]
         @states[:firing] = false
@@ -482,7 +489,9 @@ module Modules
     
     def do_draw(x, y, a, render_depth=0)
       @image.draw_rot(x, y, render_depth+ZOrder::Player,a.radians_to_gosu)
-      @scene.window.draw_line(@start_point.x, @start_point.y, Gosu::Color::RED, @end_point.x, @end_point.y, Gosu::Color::RED, render_depth+ZOrder::UI) if @states[:firing]
+      @scene.window.draw_line(@start_point.x, @start_point.y, Gosu::Color::RED, @end_point.x, @end_point.y, Gosu::Color::RED, render_depth+ZOrder::UI+33333999999876543) if @states[:firing]
+      point = get_point(THRUST_POINT)
+      @scene.window.draw_line(point.x, point.y, Gosu::Color::RED, get_p.x, get_p.y, Gosu::Color::RED, render_depth+ZOrder::UI+33333999999876543)
       #draw_battery
     end
   end

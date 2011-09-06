@@ -163,14 +163,15 @@ module Scenes
     def end_drag
       if @selected
         # TODO: only mount once and when movement is > .. or whatever
+        # FIXME: what is this for?
         if (@selected.shape.body.p.x - @selected_start_x).abs  > 10 || (@selected.shape.body.p.y - @selected_start_y).abs  > 10 || (@selected.shape.body.a - @selected_rotation).abs > 1
-          @previous_scene.connection_manager.remove_for_object(@selected)
+          #@previous_scene.connection_manager.remove_for_object(@selected)
         end
         
         @selected.mount_points.each do |mp1|
           @mount_points.each do |mp2|
             if Gosu.distance(mp1.space_pos.x, mp1.space_pos.y, mp2.space_pos.x, mp2.space_pos.y) < 5
-              @previous_scene.connection_manager.remove_for_object(@selected)#disconnect(mp2.object, @selected)
+              #@previous_scene.connection_manager.remove_for_object(@selected)#disconnect(mp2.object, @selected)
               
               other_angle = (mp2.object.get_a + mp2.angle.degrees_to_radians) #(mp2.object.shape.body.a + mp2.angle.degrees_to_radians)
               @selected.shape.body.a = (other_angle - 180.degrees_to_radians) - mp1.angle.degrees_to_radians
@@ -179,7 +180,7 @@ module Scenes
               #@selected.add_data({:parent_mount_point => mp2.index, :mount_on => mp1.index})
               
               #Actually mount!
-              @selected.mount_on(mp2.index, mp1.index, @selected)
+              mp2.object  .mount_on(mp2.index, mp1.index, @selected)
               
               if mp2.object.attached?
                 p "ship is attached"
@@ -187,12 +188,12 @@ module Scenes
                 mp2.object.ship.add_module(@selected)
                 mp2.object.ship.update_ship
               else
-                @selected.attach_to(mp2.object.ship)
+                @selected.attach_to(mp2.object.ship) #huh?
               end
               
               @previous_scene.space.rehash_shape(@selected.shape)
               
-              @previous_scene.connection_manager.connect(mp2.object, @selected)
+              #@previous_scene.connection_manager.connect(mp2.object, @selected)
               p "Connected #{@selected} with #{mp2.object}"
             end
           end

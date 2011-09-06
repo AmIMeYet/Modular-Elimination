@@ -275,6 +275,9 @@ class CP::Space
   attr_reader :cp_constraints
   alias :add_constraint_old :add_constraint
   alias :remove_constraint_old :remove_constraint
+  attr_reader :cp_shapes
+  alias :add_shape_old :add_shape
+  alias :remove_shape_old :remove_shape
   
   def add_constraint(constraint)
     @cp_constraints ||= []
@@ -285,6 +288,17 @@ class CP::Space
   def remove_constraint(constraint)
     @cp_constraints.delete(constraint) if @cp_constraints && @cp_constraints.include?(constraint)
     remove_constraint_old(constraint)
+  end
+  
+  def add_shape(shape)
+    @cp_shapes ||= []
+    @cp_shapes << shape
+    add_shape_old(shape)
+  end
+  
+  def remove_shape(shape)
+    @cp_shapes.delete(shape) if @cp_shapes && @cp_shapes.include?(shape)
+    remove_shape_old(shape)
   end
 end
 
@@ -327,19 +341,19 @@ class Camera
   end
   
   def mouse_x
-    @window.mouse_x - (SCREEN_WIDTH/2) + @pos.x
+    (@window.mouse_x * @scale_x) - ((SCREEN_WIDTH/2) * @scale_x) + (@pos.x )
   end
   
   def mouse_y
-    @window.mouse_y - (SCREEN_HEIGHT/2) + @pos.y
+    (@window.mouse_y * @scale_y) - ((SCREEN_HEIGHT/2) * @scale_y) + (@pos.y )
   end
   
-  def zoomin(x, y)
+  def zoomout
     @scale_x *= 1.1
     @scale_y *= 1.1
   end
   
-  def zoomout
+  def zoomin(x, y)
     @scale_x *= 0.9
     @scale_y *= 0.9
   end

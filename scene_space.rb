@@ -1,7 +1,7 @@
 module Scenes
 
   class SpaceScene < BasicScene
-    attr_reader :space, :particle_system, :connection_manager, :ships, :modules, :font, :camera
+    attr_reader :space, :particle_system, :ships, :modules, :font, :camera
     def initialize(window)
       super
       
@@ -20,25 +20,32 @@ module Scenes
       @space.damping = 1.0 # 0.8
       
       @particle_system = ParticleSystem.new(self)
-      @connection_manager = ConnectionManager.new(self)
+      #@connection_manager = ConnectionManager.new(self)
       
       @space.add_collision_func(:rocket, :module) do |rocket_shape, ship_shape|
-        #@modules.each do |mod|
-        #  next if mod.shape == rocket_shape # Don't collide with self!
-        #  force_multiplier = 1000.0
-        #  diff = mod.shape.body.p - rocket_shape.body.p
-        #  length = diff.length
-        #  dir = diff.normalize_safe
-        #  
-        #  mod.shape.body.apply_impulse(dir * ((1.0/length) * force_multiplier), CP::Vec2.new(0.0, 0.0))
-        #end #TODO reimplement
+        (@modules + @ships).each do |mod|
+          #next if mod.shape == rocket_shape # Don't collide with self!
+          body = ((mod.is_a? Modules::BasicModule) || (mod.is_a? Projectiles::BasicProjectile) ? mod.shape.body : mod.body)
+          force_multiplier = 1000.0
+          diff = body.p - rocket_shape.body.p
+          length = diff.length
+          dir = diff.normalize_safe
+          
+          force_multiplier *= 10 if mod.is_a? Ship
+          
+          body.apply_impulse(dir * ((1.0/length) * force_multiplier), CP::Vec2.new(0.0, 0.0))
+        end #TODO reimploment
         
         schedule_remove(rocket_shape.body.object) # I'm gone!
         #schedule_remove(ship_shape.body.object) #lol! FIXME
         
         mod = ship_shape.object
-        if mod.attached?
+        if false && mod.attached?
           mod.ship.remove_module(mod)
+          mod.parent.unmount(mod) if mod.mounted?
+          mod.mount_points.each do |mp|
+            mod.unmount(mp.child)
+          end
         end
         
         false # Don't do any physics here!
@@ -182,7 +189,7 @@ module Scenes
       if scheme[:mounts]
         scheme[:mounts].each_pair do |mount_point, child_scheme|
           child = build_from_scheme(child_scheme, ship, module_entity, mount_point)
-          @connection_manager.connect(module_entity, child) # FIXME deprecated
+          #@connection_manager.connect(module_entity, child) # FIXME deprecated
         end
       end
       
@@ -264,7 +271,7 @@ module Scenes
           @space.remove_shape(object.shape)
         end
         
-        @connection_manager.remove_for_object(object)
+        #@connection_manager.remove_for_object(object)
       end
       
       @remove_queue.clear
@@ -272,6 +279,8 @@ module Scenes
 
     def button_down(id)
       case id
+      when Gosu::KbK
+        @ships.first.bloody_unmount_all!
       when Gosu::KbE
         @window.start_scene(Scenes::ShipEditorScene.new(@window, self))
       when Gosu::KbB
@@ -336,6 +345,19 @@ module Scenes
           mod.mount_points.each do |mount_point|
             @mount_point_image.draw_rot(mount_point.space_pos.x, mount_point.space_pos.y, ZOrder::UI, mod.shape.body.a.radians_to_gosu + mount_point.angle)
             @font.draw(mount_point.index.to_s, mount_point.space_pos.x, mount_point.space_pos.y, ZOrder::UI, 0.7, 0.7, 0xff0000ff)
+          end
+        end
+      end
+      
+      @space.cp_shapes.each do |shape|
+        @window.rotate(shape.body.a.radians_to_degrees, shape.body.p.x, shape.body.p.y) do
+          num_verts = shape.num_verts
+          (0...num_verts).each do |vert_i|
+            x = shape.body.p.x
+            y = shape.body.p.y
+            cur = shape.vert(vert_i)
+            nxt = shape.vert((vert_i+1)%num_verts)
+            @window.draw_line(cur.x + x, cur.y + y, 0xffffff00, nxt.x + x, nxt.y + y, 0xffff00ff, ZOrder::UI)
           end
         end
       end

@@ -1,5 +1,8 @@
 module Projectiles
-  class Rocket
+  class BasicProjectile
+    
+  end
+  class Rocket < BasicProjectile
     attr_reader :shape, :mount_points, :data
     
     MOUNT_POINTS = []
