@@ -139,10 +139,11 @@ module Scenes
       if shape && shape.object.data[:compatible] #body.
         @selected = shape
         if @selected.object.attached?
-          ship = @selected.object.ship
-          ship.remove_module(@selected.object)  #@selected.object.detach
-          ship.update_ship
-          @selected.object.parent.unmount(@selected.object) if @selected.object.mounted?
+          #ship = @selected.object.ship
+          #ship.remove_module(@selected.object)  #@selected.object.detach
+          #ship.update_ship
+          #@selected.object.parent.unmount(@selected.object) if @selected.object.mounted?
+          @selected.object.disband
         end
           
           
@@ -180,14 +181,15 @@ module Scenes
               #@selected.add_data({:parent_mount_point => mp2.index, :mount_on => mp1.index})
               
               #Actually mount!
-              mp2.object  .mount_on(mp2.index, mp1.index, @selected)
-              
+              mp2.object.mount_on(mp2.index, mp1.index, @selected)
+             
               if mp2.object.attached?
                 p "ship is attached"
                 #@selected.attach(mp2.object.ship)
                 mp2.object.ship.add_module(@selected)
                 mp2.object.ship.update_ship
               else
+                mp2.object.create_new_ship
                 @selected.attach_to(mp2.object.ship) #huh?
               end
               

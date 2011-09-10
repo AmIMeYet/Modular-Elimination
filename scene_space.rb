@@ -34,19 +34,21 @@ module Scenes
           force_multiplier *= 10 if mod.is_a? Ship
           
           body.apply_impulse(dir * ((1.0/length) * force_multiplier), CP::Vec2.new(0.0, 0.0))
-        end #TODO reimploment
+        end #TODO reimplement
         
         schedule_remove(rocket_shape.body.object) # I'm gone!
         #schedule_remove(ship_shape.body.object) #lol! FIXME
         
-        mod = ship_shape.object
-        if false && mod.attached?
-          mod.ship.remove_module(mod)
-          mod.parent.unmount(mod) if mod.mounted?
-          mod.mount_points.each do |mp|
-            mod.unmount(mp.child)
-          end
-        end
+        #mod = ship_shape.object
+        #if false && mod.attached?
+        #  mod.ship.remove_module(mod)
+        #  mod.parent.unmount(mod) if mod.mounted?
+        #  mod.mount_points.each do |mp|
+        #    mod.unmount(mp.child)
+        #  end
+        #end
+        
+        ship_shape.object.disband
         
         false # Don't do any physics here!
       end

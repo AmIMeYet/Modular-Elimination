@@ -54,6 +54,11 @@ class Ship
   end
   
   def update_ship
+    if @children.empty?
+      @scene.space.remove_body(@body)
+      @scene.ships.delete(self)
+    end
+    
     avg_x = 0.0
     avg_y = 0.0
     mass_total = 0.0

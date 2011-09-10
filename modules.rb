@@ -124,6 +124,50 @@ module Modules
       end
     end
     
+    def create_new_ship
+      parent.unmount(self) if mounted?
+      ship = Ship.new(@scene, get_p.x, get_p.y, get_a.radians_to_degrees)
+      move_to_ship(ship)
+      ship.update_ship
+      @scene.ships << ship
+      return ship
+    end
+    
+    def move_to_ship(ship)   
+      if attached?
+        old_ship = @ship
+        old_ship.remove_module(self)
+        old_ship.update_ship
+      end
+      
+      ship.add_module(self)
+      
+      @mount_points.each do |mp|
+        next unless mp.child.is_a? BasicModule
+        # Check if the child module was part of the old ship
+        if mp.child.ship == old_ship
+          mp.child.move_to_ship(ship)
+        elsif mp.child.attached? # If the child is part of a new ship
+          ship = mp.child.ship
+          move_to_ship(ship) # merge ships
+          # and then continue with the new ship
+        end
+      end
+    end
+    
+    def disband
+      if attached?
+        old_ship = @ship
+        old_ship.remove_module(self)
+        old_ship.update_ship
+        parent.unmount(self) if mounted?
+        @mount_points.each do |mp|
+          next unless mp.child.is_a? BasicModule
+          ship = mp.child.create_new_ship
+        end
+      end
+    end
+    
     def draw_battery
       red = Gosu::Color.new(255, 255, 0, 0)
       green = Gosu::Color.new(255, 0, 255, 0)
